@@ -25,6 +25,47 @@ class AnalyticsService
     // ──────────────────────────────────────────────────────────────────────────────
 
     /**
+     * Platform-wide daily message volume grouped by channel (across ALL workspaces).
+     * Returns: [['date' => 'YYYY-MM-DD', 'whatsapp' => n, 'sms' => n, ...], ...]
+     */
+    public function platformMessageVolumeByChannel(Carbon $from, Carbon $to): array
+    {
+        $rows = Message::query()
+            ->join('conversations', 'conversations.id', '=', 'messages.conversation_id')
+            ->whereBetween('messages.created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->selectRaw('DATE(messages.created_at) as date, messages.channel, COUNT(*) as total')
+            ->groupBy('date', 'messages.channel')
+            ->orderBy('date')
+            ->get();
+
+        $byDate = [];
+        foreach ($rows as $row) {
+            $byDate[$row->date][$row->channel] = (int) $row->total;
+        }
+
+        $channels = $rows->pluck('channel')->unique()->values()->all();
+
+        return $this->fillDateSeries($from, $to, $byDate, $channels);
+    }
+
+    /**
+     * Platform-wide channel mix pie data (across ALL workspaces).
+     * Returns: [['channel' => 'whatsapp', 'total' => n], ...]
+     */
+    public function platformChannelMix(Carbon $from, Carbon $to): array
+    {
+        return Message::query()
+            ->join('conversations', 'conversations.id', '=', 'messages.conversation_id')
+            ->whereBetween('messages.created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->selectRaw('messages.channel, COUNT(*) as total')
+            ->groupBy('messages.channel')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($r) => ['channel' => $r->channel, 'total' => (int) $r->total])
+            ->toArray();
+    }
+
+    /**
      * Daily message counts grouped by channel over the given range.
      * Returns: [['date' => 'YYYY-MM-DD', 'whatsapp' => n, 'sms' => n, 'email' => n, ...], ...]
      */
