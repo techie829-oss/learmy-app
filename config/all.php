@@ -3,11 +3,11 @@
 return [
     'features' => [
         'whatsapp' => true,
-        'facebook' => false,
-        'instagram' => false,
-        'social_media' => false,
-        'ai' => false,
-        'automations' => false,
-        'leads' => false,
+        'facebook' => true,
+        'instagram' => true,
+        'social_media' => true,
+        'ai' => true,
+        'automations' => true,
+        'leads' => true,
     ],
 ];
