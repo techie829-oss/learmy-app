@@ -118,7 +118,7 @@ export default function AdminLayout({ title = 'Admin', header, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const adminNav = useAdminNav();
     const { demo_mode: demoMode, branding } = usePage().props;
-    const logoUrl = branding?.logo_url;
+    const logoUrl = branding?.logo_url || '/logonew.png';
 
     return (
         <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
@@ -126,7 +126,7 @@ export default function AdminLayout({ title = 'Admin', header, children }) {
                 open={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
                 title={t('nav.admin')}
-                logo={logoUrl ? <img src={logoUrl} alt="Logo" className="h-8 max-w-[160px] object-contain" /> : null}
+                logo={<img src={logoUrl} alt="Learmy" className="h-8 max-w-[160px] object-contain" />}
                 showCreateButton={false}
                 navItems={adminNav.map((item, i) => ({
                     ...item,
