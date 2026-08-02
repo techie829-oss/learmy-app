@@ -346,9 +346,12 @@ export default function LandingLayout({ children }) {
                     </div>
 
                     <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <p className="text-xs text-neutral-500">
-                            &copy; {new Date().getFullYear()} {appName}. {t('nav.all_rights_reserved')}
-                        </p>
+                        <div className="text-xs text-neutral-500 space-y-1">
+                            <p>&copy; {new Date().getFullYear()} {appName}. {t('nav.all_rights_reserved')}</p>
+                            <p>
+                                Developed by <a href="https://solidrix.com" target="_blank" rel="noreferrer" className="text-white hover:underline font-medium">Solidrix</a>
+                            </p>
+                        </div>
                         <button
                             type="button"
                             onClick={handleThemeToggle}

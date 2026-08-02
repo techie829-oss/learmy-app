@@ -147,9 +147,12 @@ function LeftPane({ variant }) {
             </div>
 
             {/* Footer */}
-            <p className="relative text-xs text-neutral-500">
-                &copy; {new Date().getFullYear()} {appName}. {t('nav.all_rights_reserved')}
-            </p>
+            <div className="relative text-xs text-neutral-500 space-y-1">
+                <p>&copy; {new Date().getFullYear()} {appName}. {t('nav.all_rights_reserved')}</p>
+                <p>
+                    Developed by <a href="https://solidrix.com" target="_blank" rel="noreferrer" className="text-brand-300 hover:underline font-medium">Solidrix</a>
+                </p>
+            </div>
         </div>
     );
 }
