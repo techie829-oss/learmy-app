@@ -85,14 +85,16 @@ export default function Sidebar({
     const content = (
         <aside className="flex h-full w-64 flex-col bg-secondary-900 dark:bg-neutral-900">
             {/* Brand header */}
-            <div className="flex h-14 shrink-0 items-center gap-2.5 px-4 border-b border-white/8">
-                {logoUrl ? (
-                    <img src={logoUrl} alt={appName} className="h-7 max-w-[140px] object-contain" />
-                ) : logo ? (
-                    logo
-                ) : (
-                    <img src="/logonew.png" alt={appName} className="h-10 w-auto max-w-[200px] object-contain" />
-                )}
+            <div className="flex h-20 shrink-0 items-center justify-center border-b border-white/8 px-4">
+                <div className="flex flex-col items-center gap-1">
+                    <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
+                        <img
+                            src={logoUrl || (branding?.logo_url) || '/logonew.png'}
+                            alt={appName}
+                            className="h-10 w-auto max-w-[140px] object-contain"
+                        />
+                    </div>
+                </div>
             </div>
 
             {showCreateButton && (
