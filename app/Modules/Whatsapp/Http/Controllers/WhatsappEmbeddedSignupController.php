@@ -21,9 +21,10 @@ class WhatsappEmbeddedSignupController extends Controller
         Log::info('Incoming WhatsApp embedded signup request', $request->all());
 
         $validated = $request->validate([
-            'access_token'    => ['required', 'string', 'max:2048'],
+            'code'            => ['required', 'string', 'max:2048'],
             'waba_id'         => ['nullable', 'string', 'max:64'],
             'phone_number_id' => ['nullable', 'string', 'max:64'],
+            'redirect_uri'    => ['nullable', 'string', 'max:512'],
         ]);
 
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
@@ -33,10 +34,32 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
-        // TOKEN FLOW: access_token received directly from FB.login (no code exchange).
-        // Code flow kept failing with redirect_uri mismatch (36008). Token flow works.
-        // We still upgrade to a long-lived token below.
-        $shortToken = $validated['access_token'];
+        // Exchange the code for an access token.
+        // redirect_uri must EXACTLY match what was passed to FB.login options on the frontend.
+        // We use Facebook's own login_success.html which is what the SDK uses internally.
+        $redirectUri = $validated['redirect_uri'] ?? '';
+
+        $tokenParams = [
+            'client_id'     => $meta->appId(),
+            'client_secret' => $meta->appSecret(),
+            'code'          => $validated['code'],
+            'redirect_uri'  => $redirectUri,
+        ];
+
+        $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+
+        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
+            Log::warning('WhatsApp embedded signup: code exchange failed', [
+                'workspace_id' => $workspaceId,
+                'redirect_uri' => $redirectUri,
+                'response'     => $tokenRes->json(),
+            ]);
+            return response()->json([
+                'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
+            ], 422);
+        }
+
+        $shortToken = $tokenRes->json('access_token');
 
         // Exchange short-lived token for a long-lived token (60 days)
 
