@@ -747,8 +747,9 @@ function waitForWabaSessionInfo(timeout = 120000) {
 
 function initFbSdk(appId) {
     if (typeof window.FB === 'undefined' || !appId) return false;
+    if (window.__fbSdkReady) return true;
     try {
-        FB.init({ appId, autoLogAppEvents: true, xfbml: false, version: 'v20.0' });
+        FB.init({ appId, cookie: true, autoLogAppEvents: true, xfbml: false, version: 'v20.0' });
         window.__fbSdkReady = true;
         return true;
     } catch (_) {
@@ -878,11 +879,6 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
             messenger: { feature_type: 'messenger_chat' },
         };
 
-        // Use Facebook's own login_success.html as redirect_uri.
-        // This is the URL Facebook JS SDK uses internally for the popup code flow.
-        // By passing it explicitly in both FB.login and backend exchange, we get an exact match.
-        const loginSuccessUri = 'https://www.facebook.com/connect/login_success.html';
-
         window.FB.login(
             (response) => {
                 if (response.authResponse && response.authResponse.code) {
@@ -909,7 +905,6 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
                 config_id: configId,
                 response_type: 'code',
                 override_default_response_type: true,
-                redirect_uri: loginSuccessUri,
                 extras: extrasMap[channel] ?? {},
             },
         );

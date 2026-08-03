@@ -34,16 +34,11 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
-        // Exchange the code for an access token.
-        // redirect_uri must EXACTLY match what was passed to FB.login options on the frontend.
-        // We use Facebook's own login_success.html which is what the SDK uses internally.
-        $redirectUri = $validated['redirect_uri'] ?? '';
-
+        // Exchange the short-lived auth code for an access token (Whatsway implementation: no redirect_uri passed)
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => $redirectUri,
         ];
 
         $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
@@ -51,7 +46,6 @@ class WhatsappEmbeddedSignupController extends Controller
         if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
             Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
-                'redirect_uri' => $redirectUri,
                 'response'     => $tokenRes->json(),
             ]);
             return response()->json([
