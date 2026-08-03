@@ -66,6 +66,12 @@ class WhatsappEmbeddedSignupController extends Controller
             $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
         }
 
+        // Fallback 4: Try omitting redirect_uri entirely (Meta XD Arbiter JS SDK issue workaround)
+        if (! $tokenRes->successful()) {
+            unset($tokenParams['redirect_uri']);
+            $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+        }
+
         if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
             Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
