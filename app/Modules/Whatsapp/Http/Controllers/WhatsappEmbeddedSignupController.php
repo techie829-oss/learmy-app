@@ -21,12 +21,11 @@ class WhatsappEmbeddedSignupController extends Controller
         Log::info('Incoming WhatsApp embedded signup request', $request->all());
 
         $validated = $request->validate([
-            'code'             => ['required', 'string', 'max:2048'],
-            'waba_id'          => ['nullable', 'string', 'max:64'],
-            'phone_number_id'  => ['nullable', 'string', 'max:64'],
-            // redirect_uri is intentionally NOT validated/used — when the code is generated
-            // by FB.login (JS SDK), Meta registers its own internal XD Arbiter URL as
-            // redirect_uri. Sending any other URI in the exchange will always mismatch.
+            'access_token'    => ['required', 'string', 'max:2048'],
+            'waba_id'         => ['nullable', 'string', 'max:64'],
+            'phone_number_id' => ['nullable', 'string', 'max:64'],
+            // TOKEN FLOW: We receive the access_token directly from FB.login (JS SDK).
+            // No code exchange needed — completely avoids redirect_uri mismatch issues.
         ]);
 
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
@@ -36,37 +35,12 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
-        // Exchange the short-lived auth code for an access token.
-        //
-        // IMPORTANT: Do NOT include redirect_uri here.
-        // When FB.login() (JS SDK) is used, Meta internally registers its own
-        // XD Arbiter URL (staticxx.facebook.com/...) as the redirect_uri for the code.
-        // If we send ANY other URI — even the exact page URL — Meta will reject it
-        // with "Error validating verification code. Please make sure your redirect_uri
-        // is identical to the one you used in the OAuth dialog request".
-        // The correct behavior for JS SDK code exchange is to omit redirect_uri entirely.
-        $tokenParams = [
-            'client_id'     => $meta->appId(),
-            'client_secret' => $meta->appSecret(),
-            'code'          => $validated['code'],
-        ];
+        // The short-lived user access token comes directly from the browser (FB.login token flow).
+        // We skip code exchange entirely — no redirect_uri, no mismatch possible.
+        $shortToken = $validated['access_token'];
 
-        $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+        // Exchange short-lived token for a long-lived token (60 days)
 
-        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed', [
-                'workspace_id' => $workspaceId,
-                'response'     => $tokenRes->json(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
-            ], 422);
-        }
-
-        $shortToken = $tokenRes->json('access_token');
-
-        // Exchange short-lived token for a long-lived token
         $longTokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', [
             'grant_type'        => 'fb_exchange_token',
             'client_id'         => $meta->appId(),
