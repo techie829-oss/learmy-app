@@ -18,6 +18,8 @@ class WhatsappEmbeddedSignupController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        Log::info('Incoming WhatsApp embedded signup request', $request->all());
+
         $validated = $request->validate([
             'code'             => ['required', 'string', 'max:2048'],
             'waba_id'          => ['nullable', 'string', 'max:64'],
