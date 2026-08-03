@@ -20,7 +20,7 @@ class WhatsappEmbeddedSignupController extends Controller
     {
         $validated = $request->validate([
             'code'             => ['required', 'string', 'max:2048'],
-            'waba_id'          => ['required', 'string', 'max:64'],
+            'waba_id'          => ['nullable', 'string', 'max:64'],
             'phone_number_id'  => ['nullable', 'string', 'max:64'],
         ]);
 
@@ -75,6 +75,30 @@ class WhatsappEmbeddedSignupController extends Controller
         $accessToken = $longTokenRes->successful() && $longTokenRes->json('access_token')
             ? $longTokenRes->json('access_token')
             : $shortToken;
+
+        // If waba_id was not provided via postMessage, fetch it from the debug_token endpoint
+        if (empty($validated['waba_id'])) {
+            $debugTokenRes = Http::get('https://graph.facebook.com/v20.0/debug_token', [
+                'input_token' => $accessToken,
+                'access_token' => $meta->appId() . '|' . $meta->appSecret(),
+            ]);
+
+            if ($debugTokenRes->successful()) {
+                $granularScopes = $debugTokenRes->json('data.granular_scopes') ?? [];
+                foreach ($granularScopes as $scope) {
+                    if ($scope['scope'] === 'whatsapp_business_messaging' && !empty($scope['target_ids'])) {
+                        $validated['waba_id'] = (string) $scope['target_ids'][0];
+                        break;
+                    }
+                }
+            }
+
+            if (empty($validated['waba_id'])) {
+                return response()->json([
+                    'message' => 'Connected to Meta, but no WhatsApp Business Account (WABA) was found or selected. Please make sure to create or select a WhatsApp Business Account during the setup.',
+                ], 422);
+            }
+        }
 
         // Fetch WABA details from Meta
         $wabaRes = Http::withToken($accessToken)

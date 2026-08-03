@@ -550,10 +550,6 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
 
     const handleWaEmbeddedCode = useCallback(async (code, wabaId, phoneNumberId = null) => {
         setWaApiError(null);
-        if (!wabaId) {
-            setWaApiError(t('inbox.could_not_detect_waba'));
-            return;
-        }
         setWaSubmitting(true);
         try {
             const res = await fetch(route('client.whatsapp.setup.embedded-signup'), {
