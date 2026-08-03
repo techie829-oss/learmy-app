@@ -551,15 +551,18 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
     const handleWaEmbeddedCode = useCallback(async (code, wabaId, phoneNumberId = null) => {
         setWaApiError(null);
         setWaSubmitting(true);
+
+        const currentRedirectUri = window.location.href.split('?')[0].split('#')[0];
+
         try {
             const res = await fetch(route('client.whatsapp.setup.embedded-signup'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId }),
+                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId, redirect_uri: currentRedirectUri }),
             });
             const json = await res.json();
             if (!res.ok) {
