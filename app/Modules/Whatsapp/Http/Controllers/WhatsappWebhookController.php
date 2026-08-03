@@ -143,6 +143,12 @@ class WhatsappWebhookController extends Controller
 
     private function globalVerifyToken(): ?string
     {
+        $config = \App\Modules\Integrations\Models\IntegrationConfig::forProvider('meta_app');
+        $customToken = $config?->credentials['verify_token'] ?? null;
+        if (! empty($customToken)) {
+            return $customToken;
+        }
+
         $meta = CredentialResolver::system()->meta();
         if (! $meta?->appId() || ! $meta->appSecret()) {
             return null;
