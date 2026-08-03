@@ -86,6 +86,11 @@ class WhatsappEmbeddedSignupController extends Controller
                 'access_token' => $meta->appId() . '|' . $meta->appSecret(),
             ]);
 
+            Log::info('WhatsApp embedded signup: debug_token response', [
+                'workspace_id' => $workspaceId,
+                'response' => $debugTokenRes->json(),
+            ]);
+
             if ($debugTokenRes->successful()) {
                 $granularScopes = $debugTokenRes->json('data.granular_scopes') ?? [];
                 foreach ($granularScopes as $scope) {
