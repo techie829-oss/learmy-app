@@ -48,9 +48,21 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
 
-        // Fallback: Try empty string if specific URL fails
+        // Fallback 1: Try empty string if specific URL fails
         if (! $tokenRes->successful() && !empty($redirectUri)) {
             $tokenParams['redirect_uri'] = '';
+            $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+        }
+
+        // Fallback 2: Try config('app.url') without trailing slash
+        if (! $tokenRes->successful()) {
+            $tokenParams['redirect_uri'] = rtrim((string) config('app.url'), '/');
+            $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+        }
+
+        // Fallback 3: Try config('app.url') with trailing slash
+        if (! $tokenRes->successful()) {
+            $tokenParams['redirect_uri'] = rtrim((string) config('app.url'), '/') . '/';
             $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
         }
 
