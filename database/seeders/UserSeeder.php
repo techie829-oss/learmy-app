@@ -18,16 +18,16 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        $email = env('CLIENT_SEED_EMAIL', 'client@example.com');
-        $password = env('CLIENT_SEED_PASSWORD') ?: Str::password(16);
+        $email = env('CLIENT_SEED_EMAIL', 'admin@learmyeducoach.com');
+        $password = env('CLIENT_SEED_PASSWORD', 'Admin1234');
 
         $client = Client::firstOrCreate(
             ['email' => $email],
             [
-                'name' => 'Demo Client',
+                'name' => 'Learmy EduCoach',
                 'status' => Client::STATUS_ACTIVE,
-                'base_currency' => 'USD',
-                'currency_symbol' => '$',
+                'base_currency' => 'INR',
+                'currency_symbol' => '₹',
                 'currency_position' => 'before',
             ]
         );

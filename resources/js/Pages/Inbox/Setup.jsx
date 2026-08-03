@@ -727,7 +727,7 @@ function waitForWabaSessionInfo(timeout = 120000) {
         }, timeout);
 
         function handler(event) {
-            if (event.origin !== 'https://www.facebook.com') return;
+            if (!['https://www.facebook.com', 'https://web.facebook.com', 'https://facebook.com'].includes(event.origin)) return;
             try {
                 const parsed = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
                 if (parsed?.type === 'WA_EMBEDDED_SIGNUP') {
@@ -870,7 +870,7 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
         const sessionInfoPromise = isWhatsapp ? waitForWabaSessionInfo() : Promise.resolve(null);
 
         const extrasMap = {
-            whatsapp:  { sessionInfoVersion: '3' },
+            whatsapp:  { setup: {}, featureType: 'whatsapp_embedded_signup', sessionInfoVersion: '3' },
             instagram: { feature_type: 'instagram_management' },
             messenger: { feature_type: 'messenger_chat' },
         };
