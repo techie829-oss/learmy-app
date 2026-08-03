@@ -21,12 +21,9 @@ class WhatsappEmbeddedSignupController extends Controller
         Log::info('Incoming WhatsApp embedded signup request', $request->all());
 
         $validated = $request->validate([
-            'code'             => ['required', 'string', 'max:2048'],
-            'waba_id'          => ['nullable', 'string', 'max:64'],
-            'phone_number_id'  => ['nullable', 'string', 'max:64'],
-            // redirect_uri is passed explicitly in FB.login options on the frontend,
-            // so Meta uses OUR URL (not internal XD Arbiter). Same URL used here = exact match.
-            'redirect_uri'     => ['nullable', 'string', 'max:512'],
+            'access_token'    => ['required', 'string', 'max:2048'],
+            'waba_id'         => ['nullable', 'string', 'max:64'],
+            'phone_number_id' => ['nullable', 'string', 'max:64'],
         ]);
 
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
@@ -36,34 +33,10 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
-        // Exchange the short-lived auth code for an access token.
-        // redirect_uri must exactly match what was passed to FB.login options on the frontend.
-        // Frontend passes redirect_uri explicitly to FB.login so Meta uses our page URL
-        // (not its internal XD Arbiter URL). We send the same URL here for an exact match.
-        $redirectUri = $validated['redirect_uri'] ?? '';
-
-        $tokenParams = [
-            'client_id'     => $meta->appId(),
-            'client_secret' => $meta->appSecret(),
-            'code'          => $validated['code'],
-            'redirect_uri'  => $redirectUri,
-        ];
-
-        $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
-
-        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed', [
-                'workspace_id' => $workspaceId,
-                'redirect_uri' => $redirectUri,
-                'response'     => $tokenRes->json(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
-            ], 422);
-        }
-
-        $shortToken = $tokenRes->json('access_token');
+        // TOKEN FLOW: access_token received directly from FB.login (no code exchange).
+        // Code flow kept failing with redirect_uri mismatch (36008). Token flow works.
+        // We still upgrade to a long-lived token below.
+        $shortToken = $validated['access_token'];
 
         // Exchange short-lived token for a long-lived token (60 days)
 
@@ -81,28 +54,47 @@ class WhatsappEmbeddedSignupController extends Controller
         // If waba_id was not provided via postMessage, fetch it from the debug_token endpoint
         if (empty($validated['waba_id'])) {
             $debugTokenRes = Http::get('https://graph.facebook.com/v20.0/debug_token', [
-                'input_token' => $accessToken,
+                'input_token'  => $accessToken,
                 'access_token' => $meta->appId() . '|' . $meta->appSecret(),
             ]);
 
             Log::info('WhatsApp embedded signup: debug_token response', [
                 'workspace_id' => $workspaceId,
-                'response' => $debugTokenRes->json(),
+                'response'     => $debugTokenRes->json(),
             ]);
 
             if ($debugTokenRes->successful()) {
                 $granularScopes = $debugTokenRes->json('data.granular_scopes') ?? [];
+
+                // First try whatsapp_business_messaging (preferred: phone-level WABA)
                 foreach ($granularScopes as $scope) {
                     if ($scope['scope'] === 'whatsapp_business_messaging' && !empty($scope['target_ids'])) {
                         $validated['waba_id'] = (string) $scope['target_ids'][0];
                         break;
                     }
                 }
+
+                // Fallback: whatsapp_business_management target_ids (WABA management level)
+                // This happens when the config_id grants WABA management but messaging scope
+                // target_ids are empty (e.g., phone not yet added to WABA in this session).
+                if (empty($validated['waba_id'])) {
+                    foreach ($granularScopes as $scope) {
+                        if ($scope['scope'] === 'whatsapp_business_management' && !empty($scope['target_ids'])) {
+                            $validated['waba_id'] = (string) $scope['target_ids'][0];
+                            Log::info('WhatsApp embedded signup: using waba_id from whatsapp_business_management fallback', [
+                                'workspace_id' => $workspaceId,
+                                'waba_id'      => $validated['waba_id'],
+                                'all_wabas'    => $scope['target_ids'],
+                            ]);
+                            break;
+                        }
+                    }
+                }
             }
 
             if (empty($validated['waba_id'])) {
                 return response()->json([
-                    'message' => 'Connected to Meta, but no WhatsApp Business Account (WABA) was found or selected. Please make sure to create or select a WhatsApp Business Account during the setup.',
+                    'message' => 'Connected to Meta, but no WhatsApp Business Account (WABA) was found. Please make sure to create or select a WhatsApp Business Account during setup.',
                 ], 422);
             }
         }

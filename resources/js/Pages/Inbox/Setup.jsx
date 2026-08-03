@@ -548,7 +548,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
     const [waApiError, setWaApiError] = useState(null);
     const [waSubmitting, setWaSubmitting] = useState(false);
 
-    const handleWaEmbeddedCode = useCallback(async (code, wabaId, phoneNumberId = null, redirectUri = null) => {
+    const handleWaEmbeddedToken = useCallback(async (accessToken, wabaId, phoneNumberId = null) => {
         setWaApiError(null);
         setWaSubmitting(true);
 
@@ -560,9 +560,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                // redirect_uri must match what was passed to FB.login options exactly.
-                // We pass it explicitly so Meta uses our URL (not internal XD Arbiter URL).
-                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId, redirect_uri: redirectUri }),
+                body: JSON.stringify({ access_token: accessToken, waba_id: wabaId, phone_number_id: phoneNumberId }),
             });
             const json = await res.json();
             if (!res.ok) {
@@ -622,7 +620,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                                 channel="whatsapp"
                                 label={t('inbox.continue_meta_whatsapp')}
                                 color="green"
-                                onCode={handleWaEmbeddedCode}
+                                onToken={handleWaEmbeddedToken}
                             />
                             {waSubmitting && <p className="text-xs text-neutral-400">{t('inbox.connecting_whatsapp')}</p>}
                             {waApiError && (
@@ -842,7 +840,7 @@ function loadFbSdk(appId) {
     return window.__fbSdkPromise;
 }
 
-function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, children }) {
+function EmbeddedSignupButton({ configId, appId, channel, label, color, onToken, onCode, children }) {
     const { t } = useTranslation();
     const { props } = usePage();
     const resolvedAppId = appId || props.metaAppId;
@@ -876,25 +874,29 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
             messenger: { feature_type: 'messenger_chat' },
         };
 
-        // The redirect_uri passed to FB.login must exactly match what we send in the
-        // backend code exchange. By passing it explicitly here, Meta uses OUR URL
-        // (not its internal XD Arbiter URL) — so the backend exchange will always match.
-        const redirectUri = window.location.href.split('?')[0].split('#')[0];
-
+        // TOKEN FLOW: No response_type=code, so we get accessToken directly.
+        // This avoids redirect_uri mismatch entirely (code flow kept failing with 36008).
+        // The backend upgrades this to a long-lived token via fb_exchange_token.
         window.FB.login(
             (response) => {
-                if (response.authResponse && response.authResponse.code) {
-                    const code = response.authResponse.code;
+                if (response.authResponse && response.authResponse.accessToken) {
+                    const token = response.authResponse.accessToken;
                     if (isWhatsapp) {
                         sessionInfoPromise
                             .then((info) => {
                                 setLoading(false);
-                                onCode(code, info?.waba_id ?? null, info?.phone_number_id ?? null, redirectUri);
+                                if (onToken) onToken(token, info?.waba_id ?? null, info?.phone_number_id ?? null);
+                                else if (onCode) onCode(token, info?.waba_id ?? null, info?.phone_number_id ?? null);
                             })
-                            .catch(() => { setLoading(false); onCode(code, null, null, redirectUri); });
+                            .catch(() => {
+                                setLoading(false);
+                                if (onToken) onToken(token, null, null);
+                                else if (onCode) onCode(token, null, null);
+                            });
                     } else {
                         setLoading(false);
-                        onCode(code, null, null, redirectUri);
+                        if (onToken) onToken(token);
+                        else if (onCode) onCode(token);
                     }
                 } else {
                     setLoading(false);
@@ -905,13 +907,10 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
             },
             {
                 config_id: configId,
-                response_type: 'code',
-                override_default_response_type: true,
-                redirect_uri: redirectUri,
                 extras: extrasMap[channel] ?? {},
             },
         );
-    }, [configId, resolvedAppId, channel, onCode, t]);
+    }, [configId, resolvedAppId, channel, onToken, onCode, t]);
 
     const colors = {
         green:  'bg-[#25D366] hover:bg-[#1ebe5d] text-white',
