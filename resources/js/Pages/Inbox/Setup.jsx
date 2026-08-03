@@ -727,9 +727,11 @@ function waitForWabaSessionInfo(timeout = 120000) {
         }, timeout);
 
         function handler(event) {
+            console.log('PostMessage received:', event.origin, event.data);
             if (!['https://www.facebook.com', 'https://web.facebook.com', 'https://facebook.com'].includes(event.origin)) return;
             try {
                 const parsed = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                console.log('Parsed postMessage:', parsed);
                 if (parsed?.type === 'WA_EMBEDDED_SIGNUP') {
                     clearTimeout(timer);
                     window.removeEventListener('message', handler);
