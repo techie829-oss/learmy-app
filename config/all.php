@@ -3,8 +3,8 @@
 return [
     'features' => [
         'whatsapp' => true,
-        'facebook' => true,
-        'instagram' => true,
+        'facebook' => false,
+        'instagram' => false,
         'social_media' => true,
         'ai' => true,
         'automations' => true,
