@@ -7,12 +7,12 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
     const { t } = useTranslation();
 
     const handleGoogleConnect = () => {
-        window.location.href = route('integrations.google.redirect');
+        window.location.href = route('client.integrations.google.redirect');
     };
 
     const handleGoogleDisconnect = () => {
         if (confirm('Are you sure you want to disconnect Google Calendar?')) {
-            router.post(route('integrations.google.disconnect'));
+            router.post(route('client.integrations.google.disconnect'));
         }
     };
 

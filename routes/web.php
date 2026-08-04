@@ -41,7 +41,7 @@ Route::get('/pricing', fn () => redirect()->route('login'))->name('pricing');
 Route::get('/faq', fn () => redirect()->route('login'))->name('faq');
 Route::get('/use-cases', fn () => redirect()->route('login'))->name('use-cases');
 Route::get('/about', fn () => redirect()->route('login'))->name('about');
-Route::get('/integrations', fn () => redirect()->route('login'))->name('integrations');
+// Route::get('/integrations', fn () => redirect()->route('login'))->name('integrations');
 
 // CMS pages (e.g. /p/privacy, /p/terms)
 Route::get('/p/{slug}', fn () => abort(404))->name('cms-page.show');
