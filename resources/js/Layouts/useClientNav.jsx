@@ -32,12 +32,12 @@ export default function useClientNav() {
     const accountItems = [
         { label: t('nav.dashboard'), href: safeRoute('client.dashboard'), icon: <LayoutDashboard className={iconClass} />, activePattern: 'client.dashboard' },
         { label: 'Classes & Calendar', href: safeRoute('client.meetings.index'), icon: <Calendar className={iconClass} />, activePattern: 'client.meetings.*' },
-        { label: 'Integrations & Google', href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
+        { label: 'Integrations & Google', href: '/app/integrations', icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
     ];
 
     const accountSettingsItems = [
         { label: t('nav.workspaces'), href: safeRoute('client.workspaces.index'), icon: <Layers className={iconClass} />,   activePattern: 'client.workspaces.*' },
-        { label: 'Integrations & Google', href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
+        { label: 'Integrations & Google', href: '/app/integrations', icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
         { label: t('nav.settings'),   href: safeRoute('client.settings.index'),   icon: <Settings className={iconClass} />, activePattern: 'client.settings.*' },
     ];
 
@@ -85,7 +85,7 @@ export default function useClientNav() {
     const inboxItems = [
         { label: t('nav.inbox'),         href: safeRoute('client.inbox.index'), icon: <Inbox className={iconClass} />, activePattern: 'client.inbox.index' },
         { label: t('nav.channel_setup'), href: safeRoute('client.inbox.setup'), icon: <Inbox className={iconClass} />, activePattern: 'client.inbox.setup' },
-        { label: 'Google & Integrations', href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
+        { label: 'Google & Integrations', href: '/app/integrations', icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
     ];
 
     const aiItems = [
