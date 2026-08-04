@@ -3,7 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { CheckCircle2, AlertCircle, Calendar, MessageSquare, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export default function ClientIntegrationsIndex({ googleConnected, googleEmail, flash }) {
+export default function ClientIntegrationsIndex({ googleConnected, googleEmail, whatsappConnected, flash }) {
     const { t } = useTranslation();
 
     const handleGoogleConnect = () => {
@@ -67,8 +67,14 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
                                         </p>
                                     </div>
                                 </div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                                        whatsappConnected
+                                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                            : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700'
+                                    }`}>
+                                    {whatsappConnected
+                                        ? <><CheckCircle2 className="h-3.5 w-3.5" /> Active</>
+                                        : <><AlertCircle className="h-3.5 w-3.5" /> Not Connected</>}
                                 </span>
                             </div>
                             <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-6">

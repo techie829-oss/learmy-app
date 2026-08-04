@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\CheckoutController;
+use App\Modules\Whatsapp\Models\WhatsappBusinessAccount;
 use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\Client\ApiTokenController;
 use App\Http\Controllers\Client\AuditLogController as ClientAuditLogController;
@@ -48,9 +49,14 @@ Route::middleware(['verified'])->group(function () {
             ? \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first()
             : null;
 
+        $whatsappConnected = $workspaceId
+            ? WhatsappBusinessAccount::where('workspace_id', $workspaceId)->exists()
+            : false;
+
         return Inertia::render('client/Integrations/Index', [
-            'googleConnected' => (bool) $googleToken,
-            'googleEmail' => $googleToken?->email,
+            'googleConnected'    => (bool) $googleToken,
+            'googleEmail'        => $googleToken?->email,
+            'whatsappConnected'  => $whatsappConnected,
         ]);
     })->name('integrations.index');
 
