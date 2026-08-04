@@ -33,9 +33,7 @@ class IntegrationConfigController extends Controller
             if ($category === 'Maps' && !is_feature_enabled('leads')) {
                 continue;
             }
-            if ($category === 'Google Workspace' && !is_feature_enabled('automations') && !is_feature_enabled('ai')) {
-                continue;
-            }
+            // Google Workspace is kept visible for class calendar scheduling
 
             $config = $configs->get($provider);
             $label = IntegrationConfig::LABELS[$provider] ?? $provider;
