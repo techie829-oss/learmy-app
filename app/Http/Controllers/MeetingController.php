@@ -119,10 +119,17 @@ class MeetingController extends Controller
             }
 
             // Trigger Notification Service
-            $sentCount = $this->notificationService->dispatchNotifications($meeting);
+            $notifReport = $this->notificationService->dispatchNotifications($meeting);
 
-            $successMsg = $googleWarning
-                ?? ('Meeting scheduled successfully. Meet Link: ' . ($meetLink ?? 'None') . ' | Notifications sent: ' . $sentCount);
+            if ($googleWarning) {
+                $successMsg = $googleWarning;
+            } elseif (! $notifReport['whatsapp_connected']) {
+                $successMsg = 'Class scheduled! Meet Link: ' . ($meetLink ?? 'None') . '. Note: Connect WhatsApp in Channel Setup to send automated WhatsApp reminders to students.';
+            } elseif ($notifReport['contacts_count'] > 0) {
+                $successMsg = 'Class scheduled & WhatsApp notifications sent to ' . $notifReport['sent_count'] . ' of ' . $notifReport['contacts_count'] . ' students!';
+            } else {
+                $successMsg = 'Class scheduled successfully! Meet Link: ' . ($meetLink ?? 'None');
+            }
 
             return redirect()->route('client.meetings.index')->with('success', $successMsg);
         });

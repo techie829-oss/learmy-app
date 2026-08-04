@@ -13,21 +13,29 @@ class MeetingNotificationService
 {
     /**
      * Resolves the smart mapping targets and sends WhatsApp notifications.
+     * Returns an array report: ['whatsapp_connected' => bool, 'contacts_count' => int, 'sent_count' => int]
      */
-    public function dispatchNotifications(Meeting $meeting, string $templateName = 'class_scheduled_notification'): int
+    public function dispatchNotifications(Meeting $meeting, string $templateName = 'class_scheduled_notification'): array
     {
         $workspaceId = $meeting->workspace_id;
         $client = CloudApiClient::forWorkspace($workspaceId);
+        $contacts = $this->resolveContacts($meeting);
 
         if (!$client) {
             Log::warning('MeetingNotificationService: No active WhatsApp client for workspace', ['workspace_id' => $workspaceId]);
-            return 0;
+            return [
+                'whatsapp_connected' => false,
+                'contacts_count'     => $contacts->count(),
+                'sent_count'         => 0,
+            ];
         }
 
-        $contacts = $this->resolveContacts($meeting);
-        
         if ($contacts->isEmpty()) {
-            return 0;
+            return [
+                'whatsapp_connected' => true,
+                'contacts_count'     => 0,
+                'sent_count'         => 0,
+            ];
         }
 
         $sentCount = 0;
@@ -37,8 +45,6 @@ class MeetingNotificationService
             }
 
             try {
-                // You can pass template components if your template has variables
-                // For example: {{1}} for Title, {{2}} for Start Time, {{3}} for Link
                 $components = [
                     [
                         'type' => 'body',
@@ -62,16 +68,20 @@ class MeetingNotificationService
             }
         }
 
-        return $sentCount;
+        return [
+            'whatsapp_connected' => true,
+            'contacts_count'     => $contacts->count(),
+            'sent_count'         => $sentCount,
+        ];
     }
 
     /**
      * Flattens all targets (Tags, Segments, Individual Contacts) into a unique Collection of Contacts.
      */
-    private function resolveContacts(Meeting $meeting)
+    public function resolveContacts(Meeting $meeting)
     {
         $meeting->load('targets.target');
-        
+
         $allContacts = collect();
 
         foreach ($meeting->targets as $target) {
@@ -80,15 +90,12 @@ class MeetingNotificationService
             if ($entity instanceof Contact) {
                 $allContacts->push($entity);
             } elseif ($entity instanceof ContactTag) {
-                // Load contacts for the tag
                 $allContacts = $allContacts->merge($entity->contacts);
             } elseif ($entity instanceof Segment) {
-                // Load contacts for the segment
                 $allContacts = $allContacts->merge($entity->contacts);
             }
         }
 
-        // Return uniquely by contact ID
         return $allContacts->unique('id')->values();
     }
 }
