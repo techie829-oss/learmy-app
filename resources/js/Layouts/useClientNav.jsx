@@ -141,18 +141,6 @@ export default function useClientNav() {
         navGroups.push({ type: 'group', label: 'Leads', items: leadsItems });
     }
     
-    // Add reports if there are any enabled features that generate reports
-    if (features.ai || features.social_media || features.automations) {
-        const activeReports = reportsItems.filter(item => {
-            if (item.activePattern.includes('ai') && !features.ai) return false;
-            if (item.activePattern.includes('social') && !features.social_media) return false;
-            if (item.activePattern.includes('automations') && !features.automations) return false;
-            return true;
-        });
-        navGroups.push({ type: 'group', label: 'Reports', items: activeReports });
-    }
-
-    navGroups.push({ type: 'group', label: 'Integrations & Developer', items: developerItems });
     navGroups.push({ type: 'group', label: 'Support', items: supportItems });
     navGroups.push({ type: 'group', label: 'Institute Admin', items: accountSettingsItems });
 
