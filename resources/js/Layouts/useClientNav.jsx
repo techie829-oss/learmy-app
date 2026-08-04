@@ -32,11 +32,11 @@ export default function useClientNav() {
     const accountItems = [
         { label: t('nav.dashboard'), href: safeRoute('client.dashboard'), icon: <LayoutDashboard className={iconClass} />, activePattern: 'client.dashboard' },
         { label: 'Classes & Calendar', href: safeRoute('client.meetings.index'), icon: <Calendar className={iconClass} />, activePattern: 'client.meetings.*' },
+        { label: 'Integrations & Google', href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
     ];
 
     const accountSettingsItems = [
         { label: t('nav.workspaces'), href: safeRoute('client.workspaces.index'), icon: <Layers className={iconClass} />,   activePattern: 'client.workspaces.*' },
-        { label: 'Integrations',      href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
         { label: t('nav.settings'),   href: safeRoute('client.settings.index'),   icon: <Settings className={iconClass} />, activePattern: 'client.settings.*' },
     ];
 
