@@ -118,16 +118,23 @@ export default function useClientNav() {
 
     // Group order: daily operations first, then growth tools, periodic review, then account-adjacent config (usage-frequency–based).
     const navGroups = [
-        { type: 'group', label: 'Main',      items: accountItems },
-        { type: 'group', label: t('nav.group_messaging'),     items: messagingItems },
-        { type: 'group', label: t('nav.group_contacts'),      items: contactsItems },
+        { type: 'group', label: 'Main', items: accountItems },
     ];
+
+    // WhatsApp-related sections
+    if (features.whatsapp) {
+        navGroups.push({ type: 'group', label: t('nav.group_messaging'), items: messagingItems });
+        navGroups.push({ type: 'group', label: t('nav.group_contacts'),  items: contactsItems });
+        navGroups.push({ type: 'group', label: t('nav.inbox') || 'Inbox & Channels', items: inboxItems });
+    }
 
     if (features.automations) {
         navGroups.push({ type: 'group', label: t('nav.automations') || 'Automations', items: automationItems });
     }
 
-    navGroups.push({ type: 'group', label: t('nav.inbox') || 'Inbox & Channels', items: inboxItems });
+    if (features.broadcasts) {
+        navGroups.push({ type: 'group', label: 'Broadcasts', items: broadcastItems });
+    }
 
     if (features.ai) {
         navGroups.push({ type: 'group', label: 'AI Tools', items: aiItems });
@@ -140,10 +147,11 @@ export default function useClientNav() {
     if (features.leads) {
         navGroups.push({ type: 'group', label: 'Leads', items: leadsItems });
     }
-    
+
     if (features.developer_tools) {
         navGroups.push({ type: 'group', label: 'Integrations & Developer', items: developerItems });
     }
+
     navGroups.push({ type: 'group', label: 'Support', items: supportItems });
     navGroups.push({ type: 'group', label: 'Institute Admin', items: accountSettingsItems });
 
