@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import { ArrowLeft, Video, CheckCircle2 } from 'lucide-react';
 
@@ -59,11 +59,16 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
     const submit = (e) => {
         e.preventDefault();
         if (isEdit) {
-            put(route('client.meetings.update', meeting.id));
+            put(route('client.meetings.update', meeting.id), {
+                onSuccess: () => router.visit(route('client.meetings.index')),
+            });
         } else {
-            post(route('client.meetings.store'));
+            post(route('client.meetings.store'), {
+                onSuccess: () => router.visit(route('client.meetings.index')),
+            });
         }
     };
+
 
     return (
         <ClientLayout>
