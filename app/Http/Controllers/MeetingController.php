@@ -59,56 +59,72 @@ class MeetingController extends Controller
         // Always use the authenticated user's workspace — never trust client-supplied workspace_id.
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
-        return DB::transaction(function () use ($validated, $workspaceId) {
-            $meetLink = $validated['custom_meet_link'] ?? null;
+        $googleWarning = null;
+
+        return DB::transaction(function () use ($validated, $workspaceId, &$googleWarning) {
+            $meetLink     = $validated['custom_meet_link'] ?: null;  // treat "" as null
             $googleEventId = null;
 
             // Generate Google Meet Link if Google Integration is connected and no manual link was provided
             $googleClient = GoogleClient::resolveForWorkspace($workspaceId);
             if ($googleClient && empty($meetLink)) {
-                // Fetch calendar ID from settings or use primary
-                $calendarId = 'primary';
-                $event = $googleClient->createCalendarEvent(
-                    $calendarId,
-                    $validated['title'],
-                    Carbon::parse($validated['start_time'])->toAtomString(),
-                    Carbon::parse($validated['end_time'])->toAtomString(),
-                    [], // attendeeEmails (we notify via WhatsApp instead)
-                    true, // withMeet
-                    $validated['description'] ?? null,
-                    $validated['timezone'] ?? 'UTC'
-                );
+                try {
+                    $event = $googleClient->createCalendarEvent(
+                        'primary',
+                        $validated['title'],
+                        Carbon::parse($validated['start_time'])->toAtomString(),
+                        Carbon::parse($validated['end_time'])->toAtomString(),
+                        [],    // attendeeEmails (we notify via WhatsApp instead)
+                        true,  // withMeet
+                        $validated['description'] ?? null,
+                        $validated['timezone'] ?? 'UTC'
+                    );
 
-                $meetLink = $event['meet_url'] ?? null;
-                $googleEventId = $event['event_id'] ?? null;
+                    $meetLink      = $event['meet_url'] ?? null;
+                    $googleEventId = $event['event_id'] ?? null;
+
+                    if (empty($meetLink)) {
+                        \Log::warning('Google Calendar event created but no Meet link returned', ['event' => $event]);
+                        $googleWarning = 'Class scheduled, but Google Meet link could not be generated. Add it manually later.';
+                    }
+                } catch (\Throwable $e) {
+                    \Log::error('Google Calendar API failed during meeting creation', [
+                        'error'        => $e->getMessage(),
+                        'workspace_id' => $workspaceId,
+                    ]);
+                    $googleWarning = 'Class scheduled, but Google Meet link failed: ' . $e->getMessage();
+                }
             }
 
             // Create Meeting
             $meeting = Meeting::create([
-                'workspace_id'   => $workspaceId,
-                'title'          => $validated['title'],
-                'description'    => $validated['description'] ?? null,
-                'start_time'     => $validated['start_time'],
-                'end_time'       => $validated['end_time'],
-                'timezone'       => $validated['timezone'] ?? 'UTC',
-                'google_event_id'=> $googleEventId,
-                'meet_link'      => $meetLink,
-                'status'         => 'scheduled',
+                'workspace_id'    => $workspaceId,
+                'title'           => $validated['title'],
+                'description'     => $validated['description'] ?? null,
+                'start_time'      => $validated['start_time'],
+                'end_time'        => $validated['end_time'],
+                'timezone'        => $validated['timezone'] ?? 'UTC',
+                'google_event_id' => $googleEventId,
+                'meet_link'       => $meetLink,
+                'status'          => 'scheduled',
             ]);
 
             // Save Smart Mapping Targets
             foreach ($validated['targets'] as $target) {
                 MeetingTarget::create([
-                    'meeting_id' => $meeting->id,
-                    'target_type' => $target['type'], // e.g., 'App\\Modules\\Shared\\Models\\ContactTag'
-                    'target_id' => $target['id'],
+                    'meeting_id'  => $meeting->id,
+                    'target_type' => $target['type'],
+                    'target_id'   => $target['id'],
                 ]);
             }
 
-            // Trigger Notification Service immediately (this can be deferred to a Job in a real production environment)
+            // Trigger Notification Service
             $sentCount = $this->notificationService->dispatchNotifications($meeting);
 
-            return redirect()->route('client.meetings.index')->with('success', 'Meeting scheduled successfully. Notifications sent: ' . $sentCount);
+            $successMsg = $googleWarning
+                ?? ('Meeting scheduled successfully. Notifications sent: ' . $sentCount);
+
+            return redirect()->route('client.meetings.index')->with('success', $successMsg);
         });
     }
 

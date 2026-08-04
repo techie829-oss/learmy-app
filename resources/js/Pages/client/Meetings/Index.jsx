@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+
 import ClientLayout from '@/Layouts/ClientLayout';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
@@ -87,8 +88,11 @@ function MeetingListRow({ meeting, onDelete }) {
 }
 
 export default function Index({ meetings }) {
-    const [view, setView] = useState('list'); // 'list' | 'calendar'
+    const [view, setView] = useState('list');
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const { props } = usePage();
+    const flash = props.flash ?? {};
+
 
     const events = meetings.map(m => ({
         id: m.id,
@@ -157,7 +161,19 @@ export default function Index({ meetings }) {
                     </div>
                 </div>
 
-                {/* List View */}
+            {/* Flash message */}
+            {flash.success && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
+                    <span>✓</span> {flash.success}
+                </div>
+            )}
+            {flash.error && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                    <span>✕</span> {flash.error}
+                </div>
+            )}
+
+            {/* List View */}
                 {view === 'list' && (
                     <div className="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700/50 dark:bg-neutral-800 overflow-hidden">
                         {meetings.length === 0 ? (
