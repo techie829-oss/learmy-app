@@ -108,7 +108,80 @@ class MeetingController extends Controller
             // Trigger Notification Service immediately (this can be deferred to a Job in a real production environment)
             $sentCount = $this->notificationService->dispatchNotifications($meeting);
 
-            return redirect()->route('meetings.index')->with('success', 'Meeting scheduled successfully. Notifications sent: ' . $sentCount);
+            return redirect()->route('client.meetings.index')->with('success', 'Meeting scheduled successfully. Notifications sent: ' . $sentCount);
         });
+    }
+
+    public function show(Request $request, Meeting $meeting)
+    {
+        $workspaceId = $request->user()->workspace_id;
+        abort_if($meeting->workspace_id !== $workspaceId, 403);
+
+        $tags     = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $segments = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
+
+        return Inertia::render('client/Meetings/Create', [
+            'meeting'      => $meeting->load('targets'),
+            'tags'         => $tags,
+            'segments'     => $segments,
+            'workspace_id' => $workspaceId,
+        ]);
+    }
+
+    public function edit(Request $request, Meeting $meeting)
+    {
+        return $this->show($request, $meeting);
+    }
+
+    public function update(Request $request, Meeting $meeting)
+    {
+        $workspaceId = $request->user()->workspace_id;
+        abort_if($meeting->workspace_id !== $workspaceId, 403);
+
+        $validated = $request->validate([
+            'title'            => 'required|string|max:255',
+            'description'      => 'nullable|string',
+            'start_time'       => 'required|date',
+            'end_time'         => 'required|date|after:start_time',
+            'timezone'         => 'nullable|string|timezone',
+            'custom_meet_link' => 'nullable|url',
+            'targets'          => 'required|array|min:1',
+            'targets.*.type'   => 'required|string',
+            'targets.*.id'     => 'required|integer',
+        ]);
+
+        return DB::transaction(function () use ($meeting, $validated) {
+            $meeting->update([
+                'title'       => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'start_time'  => $validated['start_time'],
+                'end_time'    => $validated['end_time'],
+                'timezone'    => $validated['timezone'] ?? 'UTC',
+                'meet_link'   => $validated['custom_meet_link'] ?? $meeting->meet_link,
+            ]);
+
+            // Replace targets
+            $meeting->targets()->delete();
+            foreach ($validated['targets'] as $target) {
+                MeetingTarget::create([
+                    'meeting_id'  => $meeting->id,
+                    'target_type' => $target['type'],
+                    'target_id'   => $target['id'],
+                ]);
+            }
+
+            return redirect()->route('client.meetings.index')->with('success', 'Meeting updated successfully.');
+        });
+    }
+
+    public function destroy(Request $request, Meeting $meeting)
+    {
+        $workspaceId = $request->user()->workspace_id;
+        abort_if($meeting->workspace_id !== $workspaceId, 403);
+
+        $meeting->targets()->delete();
+        $meeting->delete();
+
+        return redirect()->route('client.meetings.index')->with('success', 'Meeting deleted.');
     }
 }

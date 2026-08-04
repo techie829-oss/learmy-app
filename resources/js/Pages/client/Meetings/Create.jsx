@@ -3,40 +3,38 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import { ArrowLeft } from 'lucide-react';
 
-export default function Create({ tags, segments, workspace_id }) {
-    const { data, setData, post, processing, errors } = useForm({
-        workspace_id: workspace_id,
-        title: '',
-        description: '',
-        start_time: '',
-        end_time: '',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        custom_meet_link: '',
-        targets: [], // [{ type: 'App\\Modules\\Shared\\Models\\ContactTag', id: 1 }]
+export default function Create({ tags, segments, workspace_id, meeting }) {
+    const isEdit = !!meeting;
+
+    const initialTargets = isEdit
+        ? (meeting.targets ?? []).map(t => ({ type: t.target_type, id: t.target_id }))
+        : [];
+
+    const { data, setData, post, put, processing, errors } = useForm({
+        workspace_id:     workspace_id,
+        title:            isEdit ? meeting.title : '',
+        description:      isEdit ? (meeting.description ?? '') : '',
+        start_time:       isEdit ? meeting.start_time?.slice(0, 16) : '',
+        end_time:         isEdit ? meeting.end_time?.slice(0, 16) : '',
+        timezone:         isEdit ? meeting.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+        custom_meet_link: isEdit ? (meeting.meet_link ?? '') : '',
+        targets:          initialTargets,
     });
 
-    const [selectedTargets, setSelectedTargets] = useState([]);
+    const [selectedTargets, setSelectedTargets] = useState(initialTargets);
 
     const handleTargetChange = (e) => {
         const value = e.target.value;
         if (!value) return;
-
         const [type, id] = value.split(':');
-        
-        // Avoid duplicates
-        if (selectedTargets.some(t => t.type === type && t.id === parseInt(id))) {
-            return;
-        }
-
-        const newTarget = { type, id: parseInt(id) };
-        const newTargets = [...selectedTargets, newTarget];
-        
+        if (selectedTargets.some(t => t.type === type && t.id === parseInt(id))) return;
+        const newTargets = [...selectedTargets, { type, id: parseInt(id) }];
         setSelectedTargets(newTargets);
         setData('targets', newTargets);
     };
 
     const removeTarget = (indexToRemove) => {
-        const newTargets = selectedTargets.filter((_, index) => index !== indexToRemove);
+        const newTargets = selectedTargets.filter((_, i) => i !== indexToRemove);
         setSelectedTargets(newTargets);
         setData('targets', newTargets);
     };
@@ -55,12 +53,16 @@ export default function Create({ tags, segments, workspace_id }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('client.meetings.store'));
+        if (isEdit) {
+            put(route('client.meetings.update', meeting.id));
+        } else {
+            post(route('client.meetings.store'));
+        }
     };
 
     return (
         <ClientLayout>
-            <Head title="Schedule Class" />
+            <Head title={isEdit ? 'Edit Class' : 'Schedule Class'} />
 
             <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
                 <div className="mb-6 flex items-center gap-4">
@@ -72,7 +74,7 @@ export default function Create({ tags, segments, workspace_id }) {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                            Schedule a New Class
+                            {isEdit ? 'Edit Class' : 'Schedule a New Class'}
                         </h1>
                     </div>
                 </div>
@@ -128,7 +130,7 @@ export default function Create({ tags, segments, workspace_id }) {
 
                         <div>
                             <label htmlFor="custom_meet_link" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Meeting Link (Optional Zoom / Google Meet / Custom URL)
+                                Meeting Link (Optional — Zoom / Google Meet / Custom URL)
                             </label>
                             <input
                                 id="custom_meet_link"
@@ -146,7 +148,7 @@ export default function Create({ tags, segments, workspace_id }) {
 
                         <div>
                             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Smart Mapping Targets (Who to invite)
+                                Smart Mapping Targets (Who to notify)
                             </label>
                             <select
                                 onChange={handleTargetChange}
@@ -170,7 +172,6 @@ export default function Create({ tags, segments, workspace_id }) {
                                 </optgroup>
                             </select>
 
-                            {/* Selected Targets Pill List */}
                             {selectedTargets.length > 0 && (
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {selectedTargets.map((target, index) => (
@@ -179,9 +180,9 @@ export default function Create({ tags, segments, workspace_id }) {
                                             <button
                                                 type="button"
                                                 onClick={() => removeTarget(index)}
-                                                className="ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-500 focus:bg-brand-500 focus:text-white focus:outline-none dark:hover:bg-brand-800"
+                                                className="ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-500 focus:outline-none dark:hover:bg-brand-800"
                                             >
-                                                <span className="sr-only">Remove target</span>
+                                                <span className="sr-only">Remove</span>
                                                 &times;
                                             </button>
                                         </span>
@@ -202,9 +203,6 @@ export default function Create({ tags, segments, workspace_id }) {
                                 onChange={e => setData('description', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                             />
-                            <p className="mt-2 text-xs text-neutral-500">
-                                We will automatically generate a Google Meet link and attach it to the WhatsApp message.
-                            </p>
                         </div>
 
                         <div className="flex justify-end pt-4">
@@ -213,7 +211,10 @@ export default function Create({ tags, segments, workspace_id }) {
                                 disabled={processing || selectedTargets.length === 0}
                                 className="inline-flex justify-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-neutral-900"
                             >
-                                {processing ? 'Scheduling...' : 'Schedule Class & Notify Students'}
+                                {processing
+                                    ? (isEdit ? 'Saving...' : 'Scheduling...')
+                                    : (isEdit ? 'Save Changes' : 'Schedule Class & Notify Students')
+                                }
                             </button>
                         </div>
                     </form>
