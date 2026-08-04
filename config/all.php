@@ -9,5 +9,6 @@ return [
         'ai' => false,
         'automations' => false,
         'leads' => false,
+        'developer_tools' => false,
     ],
 ];

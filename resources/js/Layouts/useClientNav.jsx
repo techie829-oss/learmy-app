@@ -141,6 +141,9 @@ export default function useClientNav() {
         navGroups.push({ type: 'group', label: 'Leads', items: leadsItems });
     }
     
+    if (features.developer_tools) {
+        navGroups.push({ type: 'group', label: 'Integrations & Developer', items: developerItems });
+    }
     navGroups.push({ type: 'group', label: 'Support', items: supportItems });
     navGroups.push({ type: 'group', label: 'Institute Admin', items: accountSettingsItems });
 
