@@ -27,7 +27,7 @@ class ClientGoogleOAuthController extends Controller
             return redirect()->back()->with('error', 'Google Client ID is not configured by system administrator.');
         }
 
-        $redirectUri = route('client.integrations.google.callback');
+        $redirectUri = (string) ($creds['redirect_uri'] ?? url('/auth/google/callback'));
         $scopes = implode(' ', [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/spreadsheets',

@@ -26,6 +26,9 @@ Route::get('/', function () {
 // Auth routes
 require __DIR__.'/auth.php';
 
+// Google OAuth global callback alias
+Route::get('/auth/google/callback', [App\Http\Controllers\ClientGoogleOAuthController::class, 'callback'])->middleware(['auth']);
+
 // Locale / currency / theme
 Route::put('/locale', [LocaleController::class, 'update'])->name('locale.update');
 Route::get('/i18n/{locale}', [I18nController::class, 'show'])->name('i18n.show');
