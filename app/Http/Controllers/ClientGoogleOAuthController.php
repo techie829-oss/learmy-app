@@ -27,7 +27,12 @@ class ClientGoogleOAuthController extends Controller
             return redirect()->back()->with('error', 'Google Client ID is not configured by system administrator.');
         }
 
-        $redirectUri = (string) ($creds['redirect_uri'] ?? url('/auth/google/callback'));
+        $redirectUri = (string) ($request->input('redirect_uri')
+            ?? $creds['redirect_uri']
+            ?? route('client.integrations.google.callback'));
+
+        $request->session()->put('google_oauth_redirect_uri', $redirectUri);
+
         $scopes = implode(' ', [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/spreadsheets',
@@ -63,7 +68,8 @@ class ClientGoogleOAuthController extends Controller
         $clientId = (string) ($creds['client_id'] ?? '');
         $clientSecret = (string) ($creds['client_secret'] ?? '');
 
-        $redirectUri = route('client.integrations.google.callback');
+        $redirectUri = $request->session()->get('google_oauth_redirect_uri')
+            ?? (string) ($creds['redirect_uri'] ?? route('client.integrations.google.callback'));
 
         $response = Http::asForm()->post(self::TOKEN_URL, [
             'client_id' => $clientId,
