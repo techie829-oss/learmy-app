@@ -79,7 +79,9 @@ class ClientGoogleOAuthController extends Controller
         }
 
         $user = $request->user();
-        $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
+        $workspaceId = $request->session()->get('current_workspace_id')
+            ?? $user?->current_workspace_id
+            ?? $user?->workspace_id;
 
         $refreshToken = $response->json('refresh_token');
         $accessToken = $response->json('access_token');
@@ -105,7 +107,9 @@ class ClientGoogleOAuthController extends Controller
     public function disconnect(Request $request)
     {
         $user = $request->user();
-        $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
+        $workspaceId = $request->session()->get('current_workspace_id')
+            ?? $user?->current_workspace_id
+            ?? $user?->workspace_id;
 
         WorkspaceGoogleToken::where('workspace_id', $workspaceId)->delete();
 

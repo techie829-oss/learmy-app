@@ -36,8 +36,17 @@ Route::middleware(['verified'])->group(function () {
     // Client Integrations & Google Calendar 1-Click Connect
     Route::get('/integrations', function (HttpRequest $request) {
         $user = $request->user();
-        $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
-        $googleToken = \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        $workspaceId = $request->session()->get('current_workspace_id')
+            ?? $user->current_workspace_id
+            ?? $user->workspace_id;
+
+        $googleToken = $workspaceId
+            ? \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first()
+            : null;
 
         return Inertia::render('client/Integrations/Index', [
             'googleConnected' => (bool) $googleToken,
