@@ -39,7 +39,7 @@ Route::middleware(['verified'])->group(function () {
         $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
         $googleToken = \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first();
 
-        return Inertia::render('Client/Integrations/Index', [
+        return Inertia::render('client/Integrations/Index', [
             'googleConnected' => (bool) $googleToken,
             'googleEmail' => $googleToken?->email,
         ]);

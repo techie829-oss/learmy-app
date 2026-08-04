@@ -11,6 +11,7 @@ export default function Create({ tags, segments, workspace_id }) {
         start_time: '',
         end_time: '',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        custom_meet_link: '',
         targets: [], // [{ type: 'App\\Modules\\Shared\\Models\\ContactTag', id: 1 }]
     });
 
@@ -123,6 +124,24 @@ export default function Create({ tags, segments, workspace_id }) {
                                 />
                                 {errors.end_time && <p className="mt-2 text-sm text-red-600">{errors.end_time}</p>}
                             </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="custom_meet_link" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                Meeting Link (Optional Zoom / Google Meet / Custom URL)
+                            </label>
+                            <input
+                                id="custom_meet_link"
+                                type="url"
+                                placeholder="https://meet.google.com/xyz-abc-def or https://zoom.us/j/1234567"
+                                value={data.custom_meet_link}
+                                onChange={e => setData('custom_meet_link', e.target.value)}
+                                className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
+                            />
+                            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                Leave empty to auto-generate a Google Meet link using your connected Google Workspace account.
+                            </p>
+                            {errors.custom_meet_link && <p className="mt-2 text-sm text-red-600">{errors.custom_meet_link}</p>}
                         </div>
 
                         <div>
