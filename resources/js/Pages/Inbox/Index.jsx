@@ -127,6 +127,12 @@ function ConversationSkeleton() {
 
 function FilterSidebar({ filters, labels, channelAccounts = [], onFolder, onChannel, onAccount, onLabel }) {
     const { t } = useTranslation();
+    const { features = {} } = usePage().props;
+    const activeChannels = ALL_CHANNELS.filter(ch => {
+        if (ch === 'instagram' && !features.instagram) return false;
+        if (ch === 'messenger' && !features.facebook) return false;
+        return true;
+    });
     return (
         <div className="flex flex-col h-full overflow-y-auto">
             {/* Folders */}
@@ -151,7 +157,7 @@ function FilterSidebar({ filters, labels, channelAccounts = [], onFolder, onChan
             {/* Channels */}
             <div className="p-2 border-b border-neutral-100 dark:border-neutral-800">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 px-2 py-1.5">{t('inbox.channels')}</p>
-                {ALL_CHANNELS.map(ch => (
+                {activeChannels.map(ch => (
                     <button
                         key={ch}
                         onClick={() => onChannel(ch)}
