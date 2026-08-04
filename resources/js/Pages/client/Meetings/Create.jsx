@@ -74,8 +74,8 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
         <ClientLayout>
             <Head title={isEdit ? 'Edit Class' : 'Schedule Class'} />
 
-            <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="mb-6 flex items-center gap-4">
+            <div className="max-w-4xl space-y-6">
+                <div className="flex items-center gap-4">
                     <Link
                         href={route('client.meetings.index')}
                         className="rounded-full p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
