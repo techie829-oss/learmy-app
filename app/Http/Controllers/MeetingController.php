@@ -45,15 +45,15 @@ class MeetingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title'       => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'start_time'  => 'required|date',
-            'end_time'    => 'required|date|after:start_time',
-            'timezone'    => 'nullable|string|timezone',
+            'title'            => 'required|string|max:255',
+            'description'      => 'nullable|string',
+            'start_time'       => 'required|date',
+            'end_time'         => 'required|date|after:start_time',
+            'timezone'         => 'nullable|string|timezone',
             'custom_meet_link' => 'nullable|url',
-            'targets'     => 'required|array|min:1',
-            'targets.*.type' => 'required|string',
-            'targets.*.id'   => 'required|integer',
+            'targets'          => 'nullable|array',
+            'targets.*.type'   => 'required_with:targets|string',
+            'targets.*.id'     => 'required_with:targets|integer',
         ]);
 
         // Always use the authenticated user's workspace — never trust client-supplied workspace_id.
@@ -62,7 +62,7 @@ class MeetingController extends Controller
         $googleWarning = null;
 
         return DB::transaction(function () use ($validated, $workspaceId, &$googleWarning) {
-            $meetLink     = $validated['custom_meet_link'] ?: null;  // treat "" as null
+            $meetLink     = !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : null;
             $googleEventId = null;
 
             // Generate Google Meet Link if Google Integration is connected and no manual link was provided
@@ -85,7 +85,7 @@ class MeetingController extends Controller
 
                     if (empty($meetLink)) {
                         \Log::warning('Google Calendar event created but no Meet link returned', ['event' => $event]);
-                        $googleWarning = 'Class scheduled, but Google Meet link could not be generated. Add it manually later.';
+                        $googleWarning = 'Class scheduled, but Google Meet link could not be generated.';
                     }
                 } catch (\Throwable $e) {
                     \Log::error('Google Calendar API failed during meeting creation', [
@@ -110,7 +110,7 @@ class MeetingController extends Controller
             ]);
 
             // Save Smart Mapping Targets
-            foreach ($validated['targets'] as $target) {
+            foreach ($validated['targets'] ?? [] as $target) {
                 MeetingTarget::create([
                     'meeting_id'  => $meeting->id,
                     'target_type' => $target['type'],
@@ -122,7 +122,7 @@ class MeetingController extends Controller
             $sentCount = $this->notificationService->dispatchNotifications($meeting);
 
             $successMsg = $googleWarning
-                ?? ('Meeting scheduled successfully. Notifications sent: ' . $sentCount);
+                ?? ('Meeting scheduled successfully. Meet Link: ' . ($meetLink ?? 'None') . ' | Notifications sent: ' . $sentCount);
 
             return redirect()->route('client.meetings.index')->with('success', $successMsg);
         });
@@ -161,10 +161,11 @@ class MeetingController extends Controller
             'end_time'         => 'required|date|after:start_time',
             'timezone'         => 'nullable|string|timezone',
             'custom_meet_link' => 'nullable|url',
-            'targets'          => 'required|array|min:1',
-            'targets.*.type'   => 'required|string',
-            'targets.*.id'     => 'required|integer',
+            'targets'          => 'nullable|array',
+            'targets.*.type'   => 'required_with:targets|string',
+            'targets.*.id'     => 'required_with:targets|integer',
         ]);
+
 
         return DB::transaction(function () use ($meeting, $validated) {
             $meeting->update([

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Video, CheckCircle2 } from 'lucide-react';
 
-export default function Create({ tags, segments, workspace_id, meeting }) {
+export default function Create({ tags = [], segments = [], workspace_id, meeting }) {
     const isEdit = !!meeting;
 
     const initialTargets = isEdit
@@ -27,10 +27,15 @@ export default function Create({ tags, segments, workspace_id, meeting }) {
         const value = e.target.value;
         if (!value) return;
         const [type, id] = value.split(':');
-        if (selectedTargets.some(t => t.type === type && t.id === parseInt(id))) return;
-        const newTargets = [...selectedTargets, { type, id: parseInt(id) }];
+        const parsedId = parseInt(id);
+        if (selectedTargets.some(t => t.type === type && t.id === parsedId)) {
+            e.target.value = '';
+            return;
+        }
+        const newTargets = [...selectedTargets, { type, id: parsedId }];
         setSelectedTargets(newTargets);
         setData('targets', newTargets);
+        e.target.value = '';
     };
 
     const removeTarget = (indexToRemove) => {
@@ -76,30 +81,36 @@ export default function Create({ tags, segments, workspace_id, meeting }) {
                         <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
                             {isEdit ? 'Edit Class' : 'Schedule a New Class'}
                         </h1>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            Set up class schedule &amp; generate Google Meet link automatically.
+                        </p>
                     </div>
                 </div>
 
                 <div className="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700/50 dark:bg-neutral-800">
                     <form onSubmit={submit} className="space-y-6 p-6">
+                        {/* Class Title */}
                         <div>
                             <label htmlFor="title" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Class Title
+                                Class Title <span className="text-red-500">*</span>
                             </label>
                             <input
                                 id="title"
                                 type="text"
+                                placeholder="e.g. Mathematics - Chapter 3 Algebra"
                                 value={data.title}
                                 onChange={e => setData('title', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                                 required
                             />
-                            {errors.title && <p className="mt-2 text-sm text-red-600">{errors.title}</p>}
+                            {errors.title && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.title}</p>}
                         </div>
 
+                        {/* Date and Time */}
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div>
                                 <label htmlFor="start_time" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                    Start Time
+                                    Start Time <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="start_time"
@@ -109,12 +120,12 @@ export default function Create({ tags, segments, workspace_id, meeting }) {
                                     className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                                     required
                                 />
-                                {errors.start_time && <p className="mt-2 text-sm text-red-600">{errors.start_time}</p>}
+                                {errors.start_time && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.start_time}</p>}
                             </div>
 
                             <div>
                                 <label htmlFor="end_time" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                    End Time
+                                    End Time <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="end_time"
@@ -124,38 +135,47 @@ export default function Create({ tags, segments, workspace_id, meeting }) {
                                     className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                                     required
                                 />
-                                {errors.end_time && <p className="mt-2 text-sm text-red-600">{errors.end_time}</p>}
+                                {errors.end_time && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.end_time}</p>}
                             </div>
                         </div>
 
+                        {/* Meeting Link */}
                         <div>
                             <label htmlFor="custom_meet_link" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Meeting Link (Optional — Zoom / Google Meet / Custom URL)
+                                Meeting Link (Optional Zoom / Google Meet URL)
                             </label>
                             <input
                                 id="custom_meet_link"
                                 type="url"
-                                placeholder="https://meet.google.com/xyz-abc-def or https://zoom.us/j/1234567"
+                                placeholder="Leave empty to auto-generate Google Meet link..."
                                 value={data.custom_meet_link}
                                 onChange={e => setData('custom_meet_link', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                             />
-                            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                Leave empty to auto-generate a Google Meet link using your connected Google Workspace account.
-                            </p>
-                            {errors.custom_meet_link && <p className="mt-2 text-sm text-red-600">{errors.custom_meet_link}</p>}
+                            {!data.custom_meet_link ? (
+                                <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                    <Video className="h-3.5 w-3.5" />
+                                    Google Meet link will be automatically generated upon saving.
+                                </p>
+                            ) : (
+                                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Custom link entered. Google Meet auto-generation skipped.
+                                </p>
+                            )}
+                            {errors.custom_meet_link && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.custom_meet_link}</p>}
                         </div>
 
+                        {/* Smart Mapping Targets */}
                         <div>
                             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Smart Mapping Targets (Who to notify)
+                                Smart Mapping Targets (Notify Students via WhatsApp)
                             </label>
                             <select
                                 onChange={handleTargetChange}
                                 defaultValue=""
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                             >
-                                <option value="" disabled>Select a Batch or Segment to add...</option>
+                                <option value="">Select a Batch or Segment to add...</option>
                                 <optgroup label="Batches (Tags)">
                                     {tags.map(tag => (
                                         <option key={`tag-${tag.id}`} value={`App\\Modules\\Shared\\Models\\ContactTag:${tag.id}`}>
@@ -172,49 +192,65 @@ export default function Create({ tags, segments, workspace_id, meeting }) {
                                 </optgroup>
                             </select>
 
-                            {selectedTargets.length > 0 && (
+                            {selectedTargets.length > 0 ? (
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {selectedTargets.map((target, index) => (
-                                        <span key={index} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+                                        <span key={index} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
                                             {getTargetName(target)}
                                             <button
                                                 type="button"
                                                 onClick={() => removeTarget(index)}
                                                 className="ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-500 focus:outline-none dark:hover:bg-brand-800"
                                             >
-                                                <span className="sr-only">Remove</span>
                                                 &times;
                                             </button>
                                         </span>
                                     ))}
                                 </div>
+                            ) : (
+                                <p className="mt-1 text-xs text-neutral-400">
+                                    Optional: Select batches or segments to automatically send WhatsApp class reminders.
+                                </p>
                             )}
-                            {errors.targets && <p className="mt-2 text-sm text-red-600">{errors.targets}</p>}
+                            {errors.targets && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.targets}</p>}
                         </div>
 
+                        {/* Description */}
                         <div>
                             <label htmlFor="description" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Description (Optional)
+                                Class Description (Optional)
                             </label>
                             <textarea
                                 id="description"
                                 rows={3}
+                                placeholder="Add instructions or topics for this class..."
                                 value={data.description}
                                 onChange={e => setData('description', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                             />
                         </div>
 
-                        <div className="flex justify-end pt-4">
+                        {/* Submit button */}
+                        <div className="flex items-center justify-between pt-4 border-t border-neutral-100 dark:border-neutral-700">
+                            <Link
+                                href={route('client.meetings.index')}
+                                className="text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+                            >
+                                Cancel
+                            </Link>
                             <button
                                 type="submit"
-                                disabled={processing || selectedTargets.length === 0}
-                                className="inline-flex justify-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-neutral-900"
+                                disabled={processing}
+                                className="inline-flex justify-center items-center gap-2 rounded-lg border border-transparent bg-brand-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-neutral-900 transition-colors"
                             >
-                                {processing
-                                    ? (isEdit ? 'Saving...' : 'Scheduling...')
-                                    : (isEdit ? 'Save Changes' : 'Schedule Class & Notify Students')
-                                }
+                                {processing ? (
+                                    <span>{isEdit ? 'Saving...' : 'Scheduling...'}</span>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span>{isEdit ? 'Save Changes' : 'Schedule Class'}</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>
