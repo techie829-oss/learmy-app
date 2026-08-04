@@ -21,7 +21,7 @@ class MeetingController extends Controller
 
     public function index(Request $request)
     {
-        $workspaceId = $request->user()->workspace_id;
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         $meetings = Meeting::with('targets')->where('workspace_id', $workspaceId)->get();
 
         return Inertia::render('client/Meetings/Index', [
@@ -31,7 +31,7 @@ class MeetingController extends Controller
 
     public function create(Request $request)
     {
-        $workspaceId = $request->user()->workspace_id;
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         $tags = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
         $segments = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
 
@@ -137,7 +137,7 @@ class MeetingController extends Controller
 
     public function show(Request $request, Meeting $meeting)
     {
-        $workspaceId = $request->user()->workspace_id;
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_if($meeting->workspace_id !== $workspaceId, 403);
 
         $tags     = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
@@ -158,7 +158,7 @@ class MeetingController extends Controller
 
     public function update(Request $request, Meeting $meeting)
     {
-        $workspaceId = $request->user()->workspace_id;
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_if($meeting->workspace_id !== $workspaceId, 403);
 
         $validated = $request->validate([
@@ -173,7 +173,6 @@ class MeetingController extends Controller
             'targets.*.id'     => 'required_with:targets|integer',
         ]);
 
-
         return DB::transaction(function () use ($meeting, $validated) {
             $meeting->update([
                 'title'       => $validated['title'],
@@ -181,12 +180,12 @@ class MeetingController extends Controller
                 'start_time'  => $validated['start_time'],
                 'end_time'    => $validated['end_time'],
                 'timezone'    => $validated['timezone'] ?? 'UTC',
-                'meet_link'   => $validated['custom_meet_link'] ?? $meeting->meet_link,
+                'meet_link'   => !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : $meeting->meet_link,
             ]);
 
             // Replace targets
             $meeting->targets()->delete();
-            foreach ($validated['targets'] as $target) {
+            foreach ($validated['targets'] ?? [] as $target) {
                 MeetingTarget::create([
                     'meeting_id'  => $meeting->id,
                     'target_type' => $target['type'],
@@ -200,7 +199,7 @@ class MeetingController extends Controller
 
     public function destroy(Request $request, Meeting $meeting)
     {
-        $workspaceId = $request->user()->workspace_id;
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_if($meeting->workspace_id !== $workspaceId, 403);
 
         $meeting->targets()->delete();
