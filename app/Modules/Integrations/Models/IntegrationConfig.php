@@ -203,15 +203,9 @@ class IntegrationConfig extends Model
         return ! empty($creds) && collect($creds)->filter()->isNotEmpty();
     }
 
-    /** Returns a fixed-length masked preview — never reveals actual credential content. */
+    /** Returns credential values unmasked for admin view. */
     public function maskedCredentials(): array
     {
-        $creds = $this->credentials ?? [];
-        $result = [];
-        foreach ($creds as $k => $v) {
-            $result[$k] = (string) $v === '' ? '' : '••••••••••••';
-        }
-
-        return $result;
+        return $this->credentials ?? [];
     }
 }
