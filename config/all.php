@@ -6,7 +6,7 @@ return [
         'facebook' => false,
         'instagram' => false,
         'social_media' => false,
-        'ai' => true,
+        'ai' => false,
         'automations' => true,
         'leads' => true,
     ],

@@ -36,6 +36,7 @@ export default function useClientNav() {
 
     const accountSettingsItems = [
         { label: t('nav.workspaces'), href: safeRoute('client.workspaces.index'), icon: <Layers className={iconClass} />,   activePattern: 'client.workspaces.*' },
+        { label: 'Integrations',      href: safeRoute('client.integrations.index'), icon: <Share2 className={iconClass} />, activePattern: 'client.integrations.*' },
         { label: t('nav.settings'),   href: safeRoute('client.settings.index'),   icon: <Settings className={iconClass} />, activePattern: 'client.settings.*' },
     ];
 

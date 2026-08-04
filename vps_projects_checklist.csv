@@ -1,0 +1,19 @@
+SNo,ProjectName,Domain,Type,FolderPath,DatabaseType,DatabaseName,Status,ChecklistNotes
+1,Learmy Website,learmyeducoach.com,Docker (learmy_app),Internal Port 8090,MySQL,learmy,WORKING & LIVE,Main website data is fully safe (July 31st backup restored) - VERIFIED WORKING
+2,Solidrix Send,send.solidrix.com,Docker (solidrix-send-app),/opt/solidrix-send,MySQL,solidrix_send,WORKING & LIVE,Latest code pulled and SMTP configured. SklOPS gateways mapping resolved - VERIFIED WORKING
+3,SaaS App (Learmy App),learmy.solidrix.com,Local Nginx + PHP,/var/www/learmy-app,MySQL,learmy_app,WORKING & LIVE,Re-cloned to correct directory. Configured on separate database learmy_app. SSL and queues enabled - VERIFIED WORKING
+4,Solidrix Site,solidrix.com,Docker (solidrix_app),Port 8010,PostgreSQL,solidrix_website,LIVE,Working on July 31st state
+5,Solidrix Social,social.solidrix.com,Local Nginx + PHP,/opt/solidrix-social,PostgreSQL,solidrix_social_db,LIVE,Working on July 31st state
+6,School ERP,sklops.com,Docker (school_erp_app),Port 9001,PostgreSQL,school_erp,WORKING & LIVE,Latest code pulled, migrated, and SMTP set to Solidrix Send - VERIFIED WORKING
+7,HRMS,hr.solidrix.com,Docker (hrms_app),Port 8000,PostgreSQL,hrms,LIVE,Working on July 31st state
+8,LMS,demolms.solidrix.com,Docker (lms_app),Port 9003,MySQL,solidrix_lms,LIVE,Working on July 31st state
+9,Chitra Medical,chitramedical.rkservices.cloud,Docker (chitra-medical-app),Port 9006,MySQL,chitramedical,LIVE,Working on July 31st state
+10,Sharma Clinic,shrmaclinic.rkservices.cloud,Docker (shrma-clinic-app),Port 9005,MySQL,shrmaclinic,LIVE,Working on July 31st state
+11,Vikasa HRD,vikasahrd.com,Docker (rs_app),Port 9004,MySQL,vikasa_hrd,LIVE,Working on July 31st state
+12,Vedant Billing,vedantbilling.com,Local Nginx + PHP,/opt/vedant_billing,PostgreSQL,billing_vedant_prod,LIVE,Working on July 31st state
+13,Tools24Now,tools24now.site,Docker,Port 3001,MySQL,tools24now_prod,LIVE,Working on July 31st state
+14,Panditji Website,shreehitpanditkapilvaidhji.com,Local Nginx + PHP,/var/www/panditji,MySQL,main_db,LIVE,Working on July 31st state
+15,phpMyAdmin (MySQL Admin),mysql.rkservices.cloud,Docker (phpmyadmin),Port 8086,MySQL,All,WORKING & LIVE,MySQL web administration database panel - VERIFIED WORKING
+16,pgAdmin (PostgreSQL Admin),pgsql.rkservices.cloud,Docker (pgadmin),Port 5050,PostgreSQL,All,WORKING & LIVE,PostgreSQL web administration database panel - VERIFIED WORKING WITH PGVECTOR
+17,Open WebUI (Chat),chat.rkservices.cloud,Docker (open-webui),Port 3000,None,None,WORKING & LIVE,Web UI chat interface for Ollama/LiteLLM - VERIFIED WORKING
+18,OpenClaw (Agent),agent.rkservices.cloud,Docker (openclaw),Port 18789,None,None,WORKING & LIVE,AI Agent Gateway service - VERIFIED WORKING

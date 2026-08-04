@@ -26,9 +26,28 @@ use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+use App\Http\Controllers\ClientGoogleOAuthController;
+use Illuminate\Http\Request as HttpRequest;
+
 Route::middleware(['verified'])->group(function () {
     // Dashboard
     Route::get('/dashboard', ClientDashboardController::class)->name('dashboard');
+
+    // Client Integrations & Google Calendar 1-Click Connect
+    Route::get('/integrations', function (HttpRequest $request) {
+        $user = $request->user();
+        $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
+        $googleToken = \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first();
+
+        return Inertia::render('Client/Integrations/Index', [
+            'googleConnected' => (bool) $googleToken,
+            'googleEmail' => $googleToken?->email,
+        ]);
+    })->name('integrations.index');
+
+    Route::get('/integrations/google/redirect', [ClientGoogleOAuthController::class, 'redirect'])->name('integrations.google.redirect');
+    Route::get('/integrations/google/callback', [ClientGoogleOAuthController::class, 'callback'])->name('integrations.google.callback');
+    Route::post('/integrations/google/disconnect', [ClientGoogleOAuthController::class, 'disconnect'])->name('integrations.google.disconnect');
 
     // Meetings (Classes)
     Route::resource('meetings', MeetingController::class);

@@ -36,6 +36,15 @@ class GoogleClient
      */
     public static function resolve(): ?self
     {
+        return static::resolveForWorkspace(null);
+    }
+
+    /**
+     * Resolve GoogleClient prioritizing the Workspace's own OAuth token if connected,
+     * falling back to the System Default Google Integration.
+     */
+    public static function resolveForWorkspace(?int $workspaceId = null): ?self
+    {
         $config = IntegrationConfig::forProvider('google_workspace');
         if (! $config || ! $config->enabled) {
             return null;
@@ -45,6 +54,14 @@ class GoogleClient
         $clientId = (string) ($creds['client_id'] ?? '');
         $clientSecret = (string) ($creds['client_secret'] ?? '');
         $refreshToken = (string) ($creds['refresh_token'] ?? '');
+
+        // Check if workspace has its own connected Google Account
+        if ($workspaceId) {
+            $workspaceToken = \App\Models\WorkspaceGoogleToken::where('workspace_id', $workspaceId)->first();
+            if ($workspaceToken && ! empty($workspaceToken->refresh_token)) {
+                $refreshToken = $workspaceToken->refresh_token;
+            }
+        }
 
         if ($clientId === '' || $clientSecret === '' || $refreshToken === '') {
             return null;

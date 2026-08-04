@@ -50,6 +50,7 @@ class MeetingController extends Controller
             'start_time'  => 'required|date',
             'end_time'    => 'required|date|after:start_time',
             'timezone'    => 'nullable|string|timezone',
+            'custom_meet_link' => 'nullable|url',
             'targets'     => 'required|array|min:1',
             'targets.*.type' => 'required|string',
             'targets.*.id'   => 'required|integer',
@@ -59,14 +60,14 @@ class MeetingController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
         return DB::transaction(function () use ($validated, $workspaceId) {
-            $meetLink = null;
+            $meetLink = $validated['custom_meet_link'] ?? null;
             $googleEventId = null;
 
-            // Generate Google Meet Link if Google Integration is connected
-            $googleClient = GoogleClient::resolve();
-            if ($googleClient) {
+            // Generate Google Meet Link if Google Integration is connected and no manual link was provided
+            $googleClient = GoogleClient::resolveForWorkspace($workspaceId);
+            if ($googleClient && empty($meetLink)) {
                 // Fetch calendar ID from settings or use primary
-                $calendarId = 'primary'; // We can make this configurable later
+                $calendarId = 'primary';
                 $event = $googleClient->createCalendarEvent(
                     $calendarId,
                     $validated['title'],

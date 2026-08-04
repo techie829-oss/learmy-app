@@ -60,6 +60,11 @@ Schedule::call(function () {
     app(WebhookIdempotencyService::class)->prune(30);
 })->weekly()->name('prune-inbound-webhook-events');
 
+// Dispatch automated WhatsApp meeting reminders (1 hour and 15 mins before start time)
+Schedule::command('meetings:send-reminders')
+    ->everyFiveMinutes()
+    ->name('send-meeting-reminders');
+
 // Sync subscription statuses with payment gateways (hourly)
 Schedule::command('billing:sync')
     ->hourly()
