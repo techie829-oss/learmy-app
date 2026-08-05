@@ -105,6 +105,8 @@ export default function Dashboard({
     const hasAutomationData = (charts.automation_runs ?? []).some((d) => sumRow(d) > 0);
     const hasSocialData = (charts.social_posts ?? []).length > 0;
 
+    const { features = {} } = usePage().props;
+
     const tiles = [
         {
             label: t('client.kpi_messages_sent') || 'Messages sent',
@@ -113,6 +115,7 @@ export default function Dashboard({
             delta: s.messages_out_delta,
             sparkline: spark(charts.messages, messageChannelKeys),
             href: route('client.inbox.index'),
+            show: features.whatsapp !== false,
         },
         {
             label: t('client.kpi_messages_received') || 'Messages received',
@@ -120,12 +123,14 @@ export default function Dashboard({
             icon: MessageSquare,
             delta: s.messages_in_delta,
             href: route('client.inbox.index'),
+            show: features.whatsapp !== false,
         },
         {
             label: t('client.kpi_open_conversations') || 'Open conversations',
             value: s.conversations_open ?? 0,
             icon: Inbox,
             href: route('client.inbox.index'),
+            show: features.whatsapp !== false,
         },
         {
             label: t('client.kpi_new_conversations') || 'New conversations',
@@ -133,6 +138,7 @@ export default function Dashboard({
             icon: MessageSquare,
             delta: s.conversations_new_delta,
             sparkline: (charts.conversations ?? []).map((d) => ({ v: Number(d.opened || 0) })),
+            show: features.whatsapp !== false,
         },
         {
             label: t('client.kpi_contacts') || 'Contacts',
@@ -142,18 +148,21 @@ export default function Dashboard({
             hint: `+${s.contacts_new ?? 0} ${t('admin.this_period') || 'this period'}`,
             sparkline: spark(charts.contacts_growth, ['contacts']),
             href: route('client.contacts.index'),
+            show: features.whatsapp !== false,
         },
         {
             label: t('client.kpi_campaigns') || 'Campaigns',
             value: s.campaigns_total ?? 0,
             icon: Megaphone,
             href: route('client.campaigns.index'),
+            show: !!features.broadcasts,
         },
         {
             label: t('client.kpi_automations') || 'Active automations',
             value: s.automations_active ?? 0,
             icon: Workflow,
             href: route('client.automations.index'),
+            show: !!features.automations,
         },
         {
             label: t('client.kpi_ai_runs') || 'AI runs',
@@ -162,8 +171,9 @@ export default function Dashboard({
             hint: `${fromCents(s.ai_cost_cents)} ${t('client.kpi_ai_cost') || 'cost'}`,
             sparkline: spark(charts.ai_tokens, ['prompt', 'completion']),
             href: route('client.ai.chatbots.index'),
+            show: !!features.ai,
         },
-    ];
+    ].filter((t) => t.show !== false);
 
     return (
         <ClientLayout title={t('client.dashboard') || 'Dashboard'}>
@@ -259,16 +269,18 @@ export default function Dashboard({
                                     height={200}
                                 />
                             </WidgetCard>
-                            <WidgetCard title={t('client.chart_ai_tokens') || 'AI tokens'}>
-                                <BarChart
-                                    data={charts.ai_tokens ?? []}
-                                    xKey="date"
-                                    yKeys={['prompt', 'completion']}
-                                    labels={{ prompt: t('client.chart_prompt'), completion: t('client.chart_completion') }}
-                                    stacked
-                                    height={200}
-                                />
-                            </WidgetCard>
+                            {features.ai && (
+                                <WidgetCard title={t('client.chart_ai_tokens') || 'AI tokens'}>
+                                    <BarChart
+                                        data={charts.ai_tokens ?? []}
+                                        xKey="date"
+                                        yKeys={['prompt', 'completion']}
+                                        labels={{ prompt: t('client.chart_prompt'), completion: t('client.chart_completion') }}
+                                        stacked
+                                        height={200}
+                                    />
+                                </WidgetCard>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -282,17 +294,17 @@ export default function Dashboard({
                                     <EmptyState>{t('client.no_data') || 'No data for this period'}</EmptyState>
                                 )}
                             </WidgetCard>
-                            {hasAutomationData ? (
+                            {features.automations && hasAutomationData ? (
                                 <WidgetCard title={t('client.chart_automation_runs') || 'Automation runs'}>
                                     <BarChart data={charts.automation_runs ?? []} xKey="date" yKeys={automationKeys} stacked height={200} />
                                 </WidgetCard>
-                            ) : hasSocialData ? (
+                            ) : features.social_media && hasSocialData ? (
                                 <WidgetCard title={t('client.chart_social_posts') || 'Social posts'}>
                                     <DonutChart data={charts.social_posts} nameKey="name" valueKey="value" height={200} innerRadius={48} outerRadius={80} />
                                 </WidgetCard>
                             ) : (
-                                <WidgetCard title={t('client.chart_automation_runs') || 'Automation runs'}>
-                                    <EmptyState>{t('client.no_data') || 'No data for this period'}</EmptyState>
+                                <WidgetCard title={t('client.chart_conversations_summary') || 'Conversations Summary'}>
+                                    <EmptyState>{t('client.no_data') || 'No additional activity for this period'}</EmptyState>
                                 </WidgetCard>
                             )}
                         </div>
@@ -328,29 +340,31 @@ export default function Dashboard({
                                 </ul>
                             </WidgetCard>
 
-                            <WidgetCard
-                                title={t('client.recent_campaigns') || 'Recent campaigns'}
-                                action={
-                                    <Link href={route('client.campaigns.index')} className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-                                        {t('client.view_all') || 'View all'}
-                                    </Link>
-                                }
-                            >
-                                <ul className="divide-y divide-neutral-100 dark:divide-neutral-700/50">
-                                    {(tables.recent_campaigns ?? []).map((c) => (
-                                        <li key={c.id} className="flex items-center justify-between gap-2 py-2">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200">{c.name}</p>
-                                                <p className="text-xs capitalize text-neutral-400">{c.channel} · {c.recipients} {t('client.recipients') || 'recipients'}</p>
-                                            </div>
-                                            <span className={`flex-shrink-0 text-xs font-medium capitalize ${CAMPAIGN_TONE[c.status] || 'text-neutral-400'}`}>{c.status}</span>
-                                        </li>
-                                    ))}
-                                    {(tables.recent_campaigns ?? []).length === 0 && (
-                                        <li className="py-6 text-center text-sm text-neutral-400">{t('client.no_campaigns') || 'No campaigns yet'}</li>
-                                    )}
-                                </ul>
-                            </WidgetCard>
+                            {features.broadcasts && (
+                                <WidgetCard
+                                    title={t('client.recent_campaigns') || 'Recent campaigns'}
+                                    action={
+                                        <Link href={route('client.campaigns.index')} className="text-sm text-brand-600 hover:underline dark:text-brand-400">
+                                            {t('client.view_all') || 'View all'}
+                                        </Link>
+                                    }
+                                >
+                                    <ul className="divide-y divide-neutral-100 dark:divide-neutral-700/50">
+                                        {(tables.recent_campaigns ?? []).map((c) => (
+                                            <li key={c.id} className="flex items-center justify-between gap-2 py-2">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200">{c.name}</p>
+                                                    <p className="text-xs capitalize text-neutral-400">{c.channel} · {c.recipients} {t('client.recipients') || 'recipients'}</p>
+                                                </div>
+                                                <span className={`flex-shrink-0 text-xs font-medium capitalize ${CAMPAIGN_TONE[c.status] || 'text-neutral-400'}`}>{c.status}</span>
+                                            </li>
+                                        ))}
+                                        {(tables.recent_campaigns ?? []).length === 0 && (
+                                            <li className="py-6 text-center text-sm text-neutral-400">{t('client.no_campaigns') || 'No campaigns yet'}</li>
+                                        )}
+                                    </ul>
+                                </WidgetCard>
+                            )}
 
                             <WidgetCard title={t('client.agent_leaderboard') || 'Agent leaderboard'}>
                                 <ul className="divide-y divide-neutral-100 dark:divide-neutral-700/50">
