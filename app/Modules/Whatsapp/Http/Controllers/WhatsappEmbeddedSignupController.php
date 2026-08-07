@@ -51,7 +51,7 @@ class WhatsappEmbeddedSignupController extends Controller
         }
 
         Log::info('TOKEN PARAMS', array_merge($tokenParams, ['client_secret' => '***HIDDEN***']));
-        Log::info('TOKEN URL', 'https://graph.facebook.com/v21.0/oauth/access_token');
+        Log::info('TOKEN URL', ['url' => 'https://graph.facebook.com/v21.0/oauth/access_token']);
 
         $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
 
