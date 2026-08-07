@@ -42,10 +42,11 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $candidateRedirectUris = array_values(array_unique(array_filter([
             $validated['redirect_uri'] ?? null,
+            'https://learmy.solidrix.com/',
+            'https://learmy.solidrix.com',
+            'https://learmy.solidrix.com/app/whatsapp/setup/embedded-signup',
             'https://www.facebook.com/connect/login_success.html',
-            rtrim(config('app.url', 'https://learmy.solidrix.com'), '/') . '/app/whatsapp/setup/embedded-signup',
-            rtrim(config('app.url', 'https://learmy.solidrix.com'), '/'),
-            '', // omit redirect_uri
+            '', // omit parameter
         ], fn($v) => $v !== null)));
 
         $tokenRes = null;
