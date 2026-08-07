@@ -40,28 +40,50 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $tokenParams = [
-            'client_id'     => $meta->appId(),
-            'client_secret' => $meta->appSecret(),
-            'code'          => $validated['code'],
-        ];
+        $candidateRedirectUris = array_values(array_unique(array_filter([
+            $validated['redirect_uri'] ?? null,
+            'https://www.facebook.com/connect/login_success.html',
+            rtrim(config('app.url', 'https://learmy.solidrix.com'), '/') . '/app/whatsapp/setup/embedded-signup',
+            rtrim(config('app.url', 'https://learmy.solidrix.com'), '/'),
+            '', // omit redirect_uri
+        ], fn($v) => $v !== null)));
 
-        if (! empty($validated['redirect_uri'])) {
-            $tokenParams['redirect_uri'] = $validated['redirect_uri'];
+        $tokenRes = null;
+        $attemptLogs = [];
+
+        foreach ($candidateRedirectUris as $candidateUri) {
+            $tokenParams = [
+                'client_id'     => $meta->appId(),
+                'client_secret' => $meta->appSecret(),
+                'code'          => $validated['code'],
+            ];
+
+            if ($candidateUri !== '') {
+                $tokenParams['redirect_uri'] = $candidateUri;
+            }
+
+            $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
+            $attemptLogs[] = [
+                'redirect_uri' => $candidateUri,
+                'status'       => $tokenRes->status(),
+                'error'        => $tokenRes->json('error.message') ?? null,
+                'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
+            ];
+
+            if ($tokenRes->successful() && ! empty($tokenRes->json('access_token'))) {
+                Log::info('WhatsApp embedded signup: code exchange succeeded', [
+                    'redirect_uri' => $candidateUri,
+                ]);
+                break;
+            }
         }
 
-        Log::info('TOKEN PARAMS', array_merge($tokenParams, ['client_secret' => '***HIDDEN***']));
-        Log::info('TOKEN URL', ['url' => 'https://graph.facebook.com/v21.0/oauth/access_token']);
-
-        $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
-
-        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed', [
+        if (! $tokenRes || ! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
+            Log::warning('WhatsApp embedded signup: code exchange failed after all candidates', [
                 'workspace_id' => $workspaceId,
                 'app_id'       => $meta->appId(),
-                'http_status'  => $tokenRes->status(),
-                'raw_body'     => $tokenRes->body(),
-                'json'         => $tokenRes->json(),
+                'attempts'     => $attemptLogs,
+                'last_body'    => $tokenRes ? $tokenRes->body() : null,
             ]);
             return response()->json([
                 'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
