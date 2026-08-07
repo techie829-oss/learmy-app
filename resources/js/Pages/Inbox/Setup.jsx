@@ -560,12 +560,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({
-                    code,
-                    waba_id: wabaId,
-                    phone_number_id: phoneNumberId,
-                    redirect_uri: 'https://www.facebook.com/connect/login_success.html',
-                }),
+                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId }),
             });
             const json = await res.json();
             if (!res.ok) {

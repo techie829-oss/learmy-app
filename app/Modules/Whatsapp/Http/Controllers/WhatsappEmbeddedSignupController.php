@@ -40,26 +40,20 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $redirectUri = $validated['redirect_uri'] ?? 'https://www.facebook.com/connect/login_success.html';
-
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => $redirectUri,
         ];
+
+        if (! empty($validated['redirect_uri'])) {
+            $tokenParams['redirect_uri'] = $validated['redirect_uri'];
+        }
 
         Log::info('TOKEN PARAMS', array_merge($tokenParams, ['client_secret' => '***HIDDEN***']));
         Log::info('TOKEN URL', 'https://graph.facebook.com/v21.0/oauth/access_token');
 
         $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
-
-        // Fallback retry: If Meta returns redirect_uri mismatch (36008), try without redirect_uri
-        if (! $tokenRes->successful() && (int) $tokenRes->json('error.error_subcode') === 36008) {
-            Log::info('WhatsApp embedded signup: 36008 mismatch, retrying without redirect_uri');
-            unset($tokenParams['redirect_uri']);
-            $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
-        }
 
         if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
             Log::warning('WhatsApp embedded signup: code exchange failed', [
