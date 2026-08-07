@@ -34,12 +34,15 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
-        // Exchange the short-lived auth code for an access token (Whatsway implementation: no redirect_uri passed)
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
         ];
+
+        if (! empty($validated['redirect_uri'])) {
+            $tokenParams['redirect_uri'] = $validated['redirect_uri'];
+        }
 
         $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
 
