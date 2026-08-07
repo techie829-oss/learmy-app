@@ -560,7 +560,12 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId }),
+                body: JSON.stringify({
+                    code,
+                    waba_id: wabaId,
+                    phone_number_id: phoneNumberId,
+                    redirect_uri: window.location.origin,
+                }),
             });
             const json = await res.json();
             if (!res.ok) {
@@ -902,6 +907,7 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
                 config_id: configId,
                 response_type: 'code',
                 override_default_response_type: true,
+                redirect_uri: window.location.origin,
                 extras: extrasMap[channel] ?? {},
             },
         );
