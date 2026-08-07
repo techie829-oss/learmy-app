@@ -49,6 +49,9 @@ class WhatsappEmbeddedSignupController extends Controller
             'redirect_uri'  => $redirectUri,
         ];
 
+        Log::info('TOKEN PARAMS', array_merge($tokenParams, ['client_secret' => '***HIDDEN***']));
+        Log::info('TOKEN URL', 'https://graph.facebook.com/v21.0/oauth/access_token');
+
         $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
 
         // Fallback retry: If Meta returns redirect_uri mismatch (36008), try without redirect_uri
