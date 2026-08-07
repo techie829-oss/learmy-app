@@ -41,15 +41,19 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'          => $validated['code'],
         ];
 
-        $tokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', $tokenParams);
+        $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
 
         if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
             Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
-                'response'     => $tokenRes->json(),
+                'app_id'       => $meta->appId(),
+                'http_status'  => $tokenRes->status(),
+                'raw_body'     => $tokenRes->body(),
+                'json'         => $tokenRes->json(),
             ]);
             return response()->json([
                 'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
+                'meta_error' => $tokenRes->json('error') ?? $tokenRes->body(),
             ], 422);
         }
 
