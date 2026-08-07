@@ -855,6 +855,7 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
 
     const launch = useCallback(async () => {
         setError(null);
+        console.log('Meta Embedded Signup Debug:', { configId, appId: resolvedAppId });
 
         if (!configId) {
             setError(t('inbox.embedded_signup_not_configured'));
