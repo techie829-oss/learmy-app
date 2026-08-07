@@ -729,17 +729,46 @@ function waitForWabaSessionInfo(timeout = 120000) {
         }, timeout);
 
         function handler(event) {
-            console.log('PostMessage received:', event.origin, event.data);
-            if (!['https://www.facebook.com', 'https://web.facebook.com', 'https://facebook.com'].includes(event.origin)) return;
+            console.log('PostMessage received:', event.origin, typeof event.data, event.data);
+            const allowedOrigins = [
+                'https://www.facebook.com',
+                'https://web.facebook.com',
+                'https://facebook.com',
+                window.location.origin,
+            ];
+            if (!allowedOrigins.includes(event.origin)) return;
+
+            let parsed = null;
             try {
-                const parsed = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                console.log('Parsed postMessage:', parsed);
-                if (parsed?.type === 'WA_EMBEDDED_SIGNUP') {
-                    clearTimeout(timer);
-                    window.removeEventListener('message', handler);
-                    resolve(parsed.data ?? {});
+                parsed = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                console.log('Parsed postMessage JSON:', parsed);
+            } catch (e) {
+                console.warn('PostMessage string is not JSON, checking query params:', event.data);
+                if (typeof event.data === 'string' && event.data.includes('=')) {
+                    try {
+                        const params = new URLSearchParams(event.data);
+                        parsed = Object.fromEntries(params.entries());
+                        console.log('Parsed postMessage URLSearchParams:', parsed);
+                    } catch (_) {}
                 }
-            } catch (_) {}
+            }
+
+            if (
+                parsed?.type === 'WA_EMBEDDED_SIGNUP' &&
+                (
+                    parsed?.event === 'FINISH' ||
+                    parsed?.event === 'FINISH_ONLY_WABA' ||
+                    parsed?.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+                )
+            ) {
+                clearTimeout(timer);
+                window.removeEventListener('message', handler);
+                resolve(parsed.data ?? parsed ?? {});
+            } else if (parsed?.waba_id || parsed?.phone_number_id) {
+                clearTimeout(timer);
+                window.removeEventListener('message', handler);
+                resolve({ waba_id: parsed.waba_id, phone_number_id: parsed.phone_number_id });
+            }
         }
 
         window.addEventListener('message', handler);
