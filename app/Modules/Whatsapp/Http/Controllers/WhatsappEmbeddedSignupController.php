@@ -34,6 +34,12 @@ class WhatsappEmbeddedSignupController extends Controller
             return response()->json(['message' => 'Meta App credentials are not configured. Please ask your administrator to configure them in Admin → Integrations → Meta App.'], 422);
         }
 
+        Log::info('Embedded Signup Exchange', [
+            'redirect_uri' => $validated['redirect_uri'] ?? null,
+            'client_id'    => $meta->appId(),
+            'code'         => substr($validated['code'], 0, 20) . '...',
+        ]);
+
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),

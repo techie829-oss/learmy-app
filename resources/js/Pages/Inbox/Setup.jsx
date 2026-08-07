@@ -552,10 +552,6 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
         setWaApiError(null);
         setWaSubmitting(true);
 
-        // The redirect_uri MUST match what was passed to FB.login options.
-        // We use Facebook's own login_success.html — this is what the JS SDK uses internally.
-        const loginSuccessUri = 'https://www.facebook.com/connect/login_success.html';
-
         try {
             const res = await fetch(route('client.whatsapp.setup.embedded-signup'), {
                 method: 'POST',
@@ -564,7 +560,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId, redirect_uri: loginSuccessUri }),
+                body: JSON.stringify({ code, waba_id: wabaId, phone_number_id: phoneNumberId }),
             });
             const json = await res.json();
             if (!res.ok) {
