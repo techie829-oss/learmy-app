@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'meta' => [
+        'graph_url' => env('META_GRAPH_API_URL', 'https://graph.facebook.com/v26.0'),
+    ],
+
     'features' => [
         'whatsapp'        => true,   // Messaging, Inbox, Channel Setup, Contacts
         'facebook'        => false,  // Messenger inbox filter + channel setup

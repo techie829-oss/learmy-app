@@ -41,12 +41,12 @@ class WhatsappEmbeddedSignupController extends Controller
         ]);
 
         $candidateRedirectUris = array_values(array_unique(array_filter([
+            '', // omit parameter (REQUIRED FIRST ATTEMPT for JS SDK Embedded Signup)
             $validated['redirect_uri'] ?? null,
-            'https://learmy.solidrix.com/',
             'https://learmy.solidrix.com',
+            'https://learmy.solidrix.com/',
             'https://learmy.solidrix.com/app/whatsapp/setup/embedded-signup',
             'https://www.facebook.com/connect/login_success.html',
-            '', // omit parameter
         ], fn($v) => $v !== null)));
 
         $tokenRes = null;
@@ -63,7 +63,8 @@ class WhatsappEmbeddedSignupController extends Controller
                 $tokenParams['redirect_uri'] = $candidateUri;
             }
 
-            $tokenRes = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', $tokenParams);
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+            $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
             $attemptLogs[] = [
                 'redirect_uri' => $candidateUri,
                 'status'       => $tokenRes->status(),
@@ -95,8 +96,8 @@ class WhatsappEmbeddedSignupController extends Controller
         $shortToken = $tokenRes->json('access_token');
 
         // Exchange short-lived token for a long-lived token (60 days)
-
-        $longTokenRes = Http::get('https://graph.facebook.com/v20.0/oauth/access_token', [
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $longTokenRes = Http::get("{$graphUrl}/oauth/access_token", [
             'grant_type'        => 'fb_exchange_token',
             'client_id'         => $meta->appId(),
             'client_secret'     => $meta->appSecret(),
