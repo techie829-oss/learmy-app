@@ -40,22 +40,23 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        // FB.login() Embedded Signup uses Meta's internal xd_arbiter popup.
-        // There is NO real redirect_uri in this flow — the code is delivered via
-        // postMessage, not via a browser redirect. Therefore the token exchange
-        // MUST be made WITHOUT a redirect_uri parameter. Any redirect_uri causes
-        // Meta to return error 36008 (mismatch), and because the code is single-use,
-        // retrying with different URIs burns the code and makes recovery impossible.
-        $graphUrl   = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        // When using config_id (Business Login / Embedded Signup), Meta REQUIRES
+        // the redirect_uri in the token exchange. It must exactly match the URI
+        // registered in the Business Login configuration for this config_id.
+        // That URI must also be in Meta App Basic Settings → App Domains.
+        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $redirectUri = $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup');
+
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            // redirect_uri intentionally omitted for JS SDK / Embedded Signup flow
+            'redirect_uri'  => $redirectUri,
         ]);
 
         Log::info('WhatsApp embedded signup: code exchange attempt', [
             'workspace_id' => $workspaceId,
+            'redirect_uri' => $redirectUri,
             'status'       => $tokenRes->status(),
             'error'        => $tokenRes->json('error.message') ?? null,
             'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
@@ -65,6 +66,7 @@ class WhatsappEmbeddedSignupController extends Controller
             Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
                 'app_id'       => $meta->appId(),
+                'redirect_uri' => $redirectUri,
                 'status'       => $tokenRes->status(),
                 'body'         => $tokenRes->body(),
             ]);

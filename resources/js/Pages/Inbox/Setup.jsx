@@ -564,9 +564,10 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     code,
                     waba_id: wabaId,
                     phone_number_id: phoneNumberId,
-                    // redirect_uri intentionally omitted:
-                    // FB.login() uses Meta's internal xd_arbiter popup — there is
-                    // no real redirect_uri. Sending one causes Meta error 36008.
+                    // For config_id (Business Login) flow, Meta requires redirect_uri
+                    // in the token exchange. It must match the URI registered in
+                    // Business Login configuration settings for config_id 4581232788790875.
+                    redirect_uri: window.location.origin + '/app/inbox/setup',
                 }),
             });
             const json = await res.json();
