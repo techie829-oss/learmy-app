@@ -110,7 +110,7 @@ class InboxSetupController extends Controller
 
         // Fetch pages the user manages with Instagram accounts connected
         $pagesRes = Http::withToken($longToken)
-            ->get(config('all.meta.graph_url', 'https://graph.facebook.com/v26.0').'/me/accounts', [
+            ->get(config('all.meta.graph_url', 'https://graph.facebook.com/v20.0').'/me/accounts', [
                 'fields' => 'id,name,access_token,instagram_business_account{id,name,username}',
                 'limit'  => 50,
             ]);
@@ -240,7 +240,7 @@ class InboxSetupController extends Controller
         $longToken = $this->exchangeForLongLivedToken($accessToken);
 
         $pagesRes = Http::withToken($longToken)
-            ->get(config('all.meta.graph_url', 'https://graph.facebook.com/v26.0').'/me/accounts', [
+            ->get(config('all.meta.graph_url', 'https://graph.facebook.com/v20.0').'/me/accounts', [
                 'fields' => 'id,name,access_token',
                 'limit'  => 50,
             ]);
@@ -280,7 +280,7 @@ class InboxSetupController extends Controller
             // fetch it explicitly. Never fall back to the user token — a user token
             // cannot resolve page-scoped PSIDs and yields Graph error 100.
             if (! $pageToken) {
-                $graphUrl  = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+                $graphUrl  = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
                 $tokenRes  = Http::withToken($longToken)
                     ->get("{$graphUrl}/{$pageId}", ['fields' => 'access_token']);
                 $pageToken = $tokenRes->json('access_token');
@@ -353,7 +353,7 @@ class InboxSetupController extends Controller
             return null;
         }
 
-        $res = Http::get(config('all.meta.graph_url', 'https://graph.facebook.com/v26.0')."/oauth/access_token", [
+        $res = Http::get(config('all.meta.graph_url', 'https://graph.facebook.com/v20.0')."/oauth/access_token", [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $code,
@@ -377,7 +377,7 @@ class InboxSetupController extends Controller
             return $shortToken;
         }
 
-        $res = Http::get(config('all.meta.graph_url', 'https://graph.facebook.com/v26.0')."/oauth/access_token", [
+        $res = Http::get(config('all.meta.graph_url', 'https://graph.facebook.com/v20.0')."/oauth/access_token", [
             'grant_type'        => 'fb_exchange_token',
             'client_id'         => $meta->appId(),
             'client_secret'     => $meta->appSecret(),
@@ -413,7 +413,7 @@ class InboxSetupController extends Controller
         }
 
         $callbackUrl = route('webhooks.meta.receive', ['token' => $verifyToken]);
-        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
         try {
             $res = Http::post("{$graphUrl}/{$appId}/subscriptions", [
@@ -465,7 +465,7 @@ class InboxSetupController extends Controller
         }
 
         try {
-            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
             $res = Http::withToken($pageToken)
                 ->post("{$graphUrl}/{$pageId}/subscribed_apps", [
                     'subscribed_fields' => 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads',
@@ -527,7 +527,7 @@ class InboxSetupController extends Controller
         }
 
         $callbackUrl = route('webhooks.meta.receive', ['token' => $verifyToken]);
-        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
         try {
             $res = Http::post("{$graphUrl}/{$appId}/subscriptions", [
@@ -585,7 +585,7 @@ class InboxSetupController extends Controller
         }
 
         try {
-            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
             $res = Http::withToken($pageToken)
                 ->post("{$graphUrl}/{$pageId}/subscribed_apps", [
                     'subscribed_fields' => 'messages,messaging_postbacks,message_reactions,message_reads',

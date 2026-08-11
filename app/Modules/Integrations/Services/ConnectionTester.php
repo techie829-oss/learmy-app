@@ -44,7 +44,7 @@ class ConnectionTester
         if (empty($token)) {
             return ['ok' => false, 'message' => 'System user token is not configured.'];
         }
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
         $resp = HttpFacade::timeout(10)->get("{$graphUrl}/me", ['access_token' => $token]);
         if ($resp->successful() && isset($resp->json()['id'])) {
             return ['ok' => true, 'message' => 'Connected. User ID: '.$resp->json()['id']];

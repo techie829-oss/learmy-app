@@ -782,7 +782,7 @@ function initFbSdk(appId) {
     if (typeof window.FB === 'undefined' || !appId) return false;
     if (window.__fbSdkReady) return true;
     try {
-        FB.init({ appId, cookie: true, autoLogAppEvents: true, xfbml: false, version: 'v26.0' });
+        FB.init({ appId, cookie: true, autoLogAppEvents: true, xfbml: false, version: 'v20.0' });
         window.__fbSdkReady = true;
         return true;
     } catch (_) {

@@ -66,7 +66,7 @@ class MessengerProfileTestCommand extends Command
         // (has a category); a user token returns a person (no category). The User
         // Profile API only works with a PAGE token, so this tells us if the connect
         // flow stored the wrong token type (code bug) vs a permission gate (Meta).
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
         $me = Http::withToken($token)->timeout(10)
             ->get("{$graphUrl}/me", ['fields' => 'id,name,category']);
         $this->line('  <fg=cyan>/me:</> '.json_encode($me->json(), JSON_UNESCAPED_SLASHES));

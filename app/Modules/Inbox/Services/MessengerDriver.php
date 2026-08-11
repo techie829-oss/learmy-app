@@ -19,7 +19,7 @@ class MessengerDriver implements ChannelDriverInterface
 {
     public static function baseUrl(): string
     {
-        return config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        return config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
     }
 
     public function __construct(private ContactService $contactService) {}

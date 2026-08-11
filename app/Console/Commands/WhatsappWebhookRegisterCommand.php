@@ -27,7 +27,7 @@ class WhatsappWebhookRegisterCommand extends Command
         $appId       = $meta->appId();
         $appSecret   = $meta->appSecret();
         $appToken    = $appId . '|' . $appSecret;
-        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
         $callbackUrl = route('webhooks.whatsapp.global.receive');
         $verifyToken = hash('sha256', $appId . $appSecret . 'wh_global_verify');
 
