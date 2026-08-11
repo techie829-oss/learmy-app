@@ -41,8 +41,10 @@ class WhatsappEmbeddedSignupController extends Controller
         ]);
 
         $candidateRedirectUris = array_values(array_unique(array_filter([
-            '', // omit parameter (REQUIRED FIRST ATTEMPT for JS SDK Embedded Signup)
             $validated['redirect_uri'] ?? null,
+            'https://learmy.solidrix.com/app/inbox/setup',
+            'https://learmy.solidrix.com/app/inbox/setup/',
+            '', // omit parameter
             'https://learmy.solidrix.com',
             'https://learmy.solidrix.com/',
             'https://learmy.solidrix.com/app/whatsapp/setup/embedded-signup',
