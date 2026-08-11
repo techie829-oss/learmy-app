@@ -40,21 +40,22 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        // When using config_id (Business Login / Embedded Signup), Meta REQUIRES
-        // the redirect_uri in the token exchange. It must exactly match the URI
-        // registered in the Business Login configuration for this config_id.
-        // That URI must also be in Meta App Basic Settings → App Domains.
+        // Code exchange — mirroring the WhatsMine reference implementation:
+        // Attempt 1: with redirect_uri = APP_URL (root, no trailing slash)
+        // Attempt 2: without redirect_uri (some Meta app configs require this)
         $graphUrl    = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
-        $redirectUri = $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup');
+        $redirectUri = rtrim((string) config('app.url'), '/');
 
-        $tokenRes = Http::get("{$graphUrl}/oauth/access_token", [
+        $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
             'redirect_uri'  => $redirectUri,
-        ]);
+        ];
 
-        Log::info('WhatsApp embedded signup: code exchange attempt', [
+        $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
+
+        Log::info('WhatsApp embedded signup: code exchange attempt 1 (with redirect_uri)', [
             'workspace_id' => $workspaceId,
             'redirect_uri' => $redirectUri,
             'status'       => $tokenRes->status(),
@@ -62,11 +63,23 @@ class WhatsappEmbeddedSignupController extends Controller
             'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
         ]);
 
+        // Retry without redirect_uri — some embedded-signup app configs need this
+        if ((! $tokenRes->successful() || empty($tokenRes->json('access_token')))) {
+            unset($tokenParams['redirect_uri']);
+            $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
+
+            Log::info('WhatsApp embedded signup: code exchange attempt 2 (no redirect_uri)', [
+                'workspace_id' => $workspaceId,
+                'status'       => $tokenRes->status(),
+                'error'        => $tokenRes->json('error.message') ?? null,
+                'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
+            ]);
+        }
+
         if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed', [
+            Log::warning('WhatsApp embedded signup: code exchange failed both attempts', [
                 'workspace_id' => $workspaceId,
                 'app_id'       => $meta->appId(),
-                'redirect_uri' => $redirectUri,
                 'status'       => $tokenRes->status(),
                 'body'         => $tokenRes->body(),
             ]);
