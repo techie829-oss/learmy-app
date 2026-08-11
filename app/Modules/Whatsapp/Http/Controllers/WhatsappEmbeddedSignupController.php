@@ -112,7 +112,8 @@ class WhatsappEmbeddedSignupController extends Controller
 
         // If waba_id was not provided via postMessage, fetch it from the debug_token endpoint
         if (empty($validated['waba_id'])) {
-            $debugTokenRes = Http::get('https://graph.facebook.com/v26.0/debug_token', [
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+            $debugTokenRes = Http::get("{$graphUrl}/debug_token", [
                 'input_token'  => $accessToken,
                 'access_token' => $meta->appId() . '|' . $meta->appSecret(),
             ]);
@@ -159,8 +160,9 @@ class WhatsappEmbeddedSignupController extends Controller
         }
 
         // Fetch WABA details from Meta
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
         $wabaRes = Http::withToken($accessToken)
-            ->get("https://graph.facebook.com/v26.0/{$validated['waba_id']}", [
+            ->get("{$graphUrl}/{$validated['waba_id']}", [
                 'fields' => 'id,name,currency,timezone_id',
             ]);
 
@@ -288,16 +290,17 @@ class WhatsappEmbeddedSignupController extends Controller
         $appSecret = $meta->appSecret();
         // App Access Token: {app_id}|{app_secret} — must be passed as query param, not Bearer header
         $appToken  = $appId . '|' . $appSecret;
+        $graphUrl  = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
 
         // Step 1: Subscribe our Meta App to this WABA's events.
         // Use the App Access Token (more reliable than the short-lived user token).
         try {
-            $subRes = Http::post("https://graph.facebook.com/v26.0/{$wabaId}/subscribed_apps", [
+            $subRes = Http::post("{$graphUrl}/{$wabaId}/subscribed_apps", [
                 'access_token' => $appToken,
             ]);
 
             if (! $subRes->successful()) {
-                $fallback = Http::post("https://graph.facebook.com/v26.0/{$wabaId}/subscribed_apps", [
+                $fallback = Http::post("{$graphUrl}/{$wabaId}/subscribed_apps", [
                     'access_token' => $userToken,
                 ]);
                 if (! $fallback->successful()) {
@@ -323,7 +326,7 @@ class WhatsappEmbeddedSignupController extends Controller
             $callbackUrl  = route('webhooks.whatsapp.global.receive');
             $globalVerify = hash('sha256', $appId . $appSecret . 'wh_global_verify');
 
-            $res = Http::post("https://graph.facebook.com/v26.0/{$appId}/subscriptions", [
+            $res = Http::post("{$graphUrl}/{$appId}/subscriptions", [
                 'access_token' => $appToken,
                 'object'       => 'whatsapp_business_account',
                 'callback_url' => $callbackUrl,
