@@ -40,60 +40,40 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $candidateRedirectUris = array_values(array_unique(array_filter([
-            $validated['redirect_uri'] ?? null,
-            'https://learmy.solidrix.com/app/inbox/setup',
-            'https://learmy.solidrix.com/app/inbox/setup/',
-            '', // omit parameter
-            'https://learmy.solidrix.com',
-            'https://learmy.solidrix.com/',
-            'https://learmy.solidrix.com/app/whatsapp/setup/embedded-signup',
-            'https://www.facebook.com/connect/login_success.html',
-        ], fn($v) => $v !== null)));
+        // FB.login() Embedded Signup uses Meta's internal xd_arbiter popup.
+        // There is NO real redirect_uri in this flow — the code is delivered via
+        // postMessage, not via a browser redirect. Therefore the token exchange
+        // MUST be made WITHOUT a redirect_uri parameter. Any redirect_uri causes
+        // Meta to return error 36008 (mismatch), and because the code is single-use,
+        // retrying with different URIs burns the code and makes recovery impossible.
+        $graphUrl   = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $tokenRes = Http::get("{$graphUrl}/oauth/access_token", [
+            'client_id'     => $meta->appId(),
+            'client_secret' => $meta->appSecret(),
+            'code'          => $validated['code'],
+            // redirect_uri intentionally omitted for JS SDK / Embedded Signup flow
+        ]);
 
-        $tokenRes = null;
-        $attemptLogs = [];
+        Log::info('WhatsApp embedded signup: code exchange attempt', [
+            'workspace_id' => $workspaceId,
+            'status'       => $tokenRes->status(),
+            'error'        => $tokenRes->json('error.message') ?? null,
+            'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
+        ]);
 
-        foreach ($candidateRedirectUris as $candidateUri) {
-            $tokenParams = [
-                'client_id'     => $meta->appId(),
-                'client_secret' => $meta->appSecret(),
-                'code'          => $validated['code'],
-            ];
-
-            if ($candidateUri !== '') {
-                $tokenParams['redirect_uri'] = $candidateUri;
-            }
-
-            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
-            $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
-            $attemptLogs[] = [
-                'redirect_uri' => $candidateUri,
-                'status'       => $tokenRes->status(),
-                'error'        => $tokenRes->json('error.message') ?? null,
-                'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
-            ];
-
-            if ($tokenRes->successful() && ! empty($tokenRes->json('access_token'))) {
-                Log::info('WhatsApp embedded signup: code exchange succeeded', [
-                    'redirect_uri' => $candidateUri,
-                ]);
-                break;
-            }
-        }
-
-        if (! $tokenRes || ! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed after all candidates', [
+        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
+            Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
                 'app_id'       => $meta->appId(),
-                'attempts'     => $attemptLogs,
-                'last_body'    => $tokenRes ? $tokenRes->body() : null,
+                'status'       => $tokenRes->status(),
+                'body'         => $tokenRes->body(),
             ]);
             return response()->json([
-                'message' => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
+                'message'    => 'Failed to exchange authorization code: ' . ($tokenRes->json('error.message') ?? 'unknown error'),
                 'meta_error' => $tokenRes->json('error') ?? $tokenRes->body(),
             ], 422);
         }
+
 
         $shortToken = $tokenRes->json('access_token');
 

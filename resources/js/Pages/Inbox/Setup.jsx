@@ -564,7 +564,9 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     code,
                     waba_id: wabaId,
                     phone_number_id: phoneNumberId,
-                    redirect_uri: window.location.origin + '/app/inbox/setup',
+                    // redirect_uri intentionally omitted:
+                    // FB.login() uses Meta's internal xd_arbiter popup — there is
+                    // no real redirect_uri. Sending one causes Meta error 36008.
                 }),
             });
             const json = await res.json();
