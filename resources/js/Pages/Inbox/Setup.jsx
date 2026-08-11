@@ -936,7 +936,6 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
                 config_id: configId,
                 response_type: 'code',
                 override_default_response_type: true,
-                redirect_uri: window.location.origin,
                 extras: extrasMap[channel] ?? {},
             },
         );
