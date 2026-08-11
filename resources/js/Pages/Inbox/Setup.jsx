@@ -564,7 +564,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     code,
                     waba_id: wabaId,
                     phone_number_id: phoneNumberId,
-                    redirect_uri: window.location.href.split('?')[0],
+                    redirect_uri: window.location.origin + '/app/inbox/setup',
                 }),
             });
             const json = await res.json();
