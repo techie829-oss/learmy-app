@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\Log;
 
 class MessengerDriver implements ChannelDriverInterface
 {
-    private const BASE = 'https://graph.facebook.com/v20.0';
+    public static function baseUrl(): string
+    {
+        return config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+    }
 
     public function __construct(private ContactService $contactService) {}
 
@@ -62,7 +65,7 @@ class MessengerDriver implements ChannelDriverInterface
     {
         $resp = Http::withToken($accessToken)
             ->timeout(15)
-            ->post(self::BASE.'/me/messages', [
+            ->post(self::baseUrl().'/me/messages', [
                 'recipient' => $recipient,
                 'message' => $message,
                 'messaging_type' => 'RESPONSE',
@@ -295,7 +298,7 @@ class MessengerDriver implements ChannelDriverInterface
         try {
             $resp = Http::withToken($pageToken)
                 ->timeout(10)
-                ->get(self::BASE."/{$psid}", [
+                ->get(self::baseUrl()."/{$psid}", [
                     'fields' => 'first_name,last_name,profile_pic',
                 ]);
 
@@ -336,7 +339,7 @@ class MessengerDriver implements ChannelDriverInterface
             try {
                 $conv = Http::withToken($pageToken)
                     ->timeout(10)
-                    ->get(self::BASE."/{$pageId}/conversations", [
+                    ->get(self::baseUrl()."/{$pageId}/conversations", [
                         'platform' => 'messenger',
                         'user_id' => $psid,
                         'fields' => 'participants',

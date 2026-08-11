@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\Log;
 
 class InstagramDriver implements ChannelDriverInterface
 {
-    private const BASE = 'https://graph.facebook.com/v20.0';
+    public static function baseUrl(): string
+    {
+        return config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+    }
 
     public function __construct(private ContactService $contactService) {}
 
@@ -64,7 +67,7 @@ class InstagramDriver implements ChannelDriverInterface
         // Primary (existing behaviour): send via the IG account messages endpoint.
         $resp = Http::withToken($accessToken)
             ->timeout(15)
-            ->post(self::BASE."/{$igAccountId}/messages", [
+            ->post(self::baseUrl()."/{$igAccountId}/messages", [
                 'recipient' => ['id' => $recipientId],
                 'message' => $messageObj,
                 'messaging_type' => 'RESPONSE',
@@ -92,7 +95,7 @@ class InstagramDriver implements ChannelDriverInterface
         // already succeed above, so their behaviour is unchanged.
         $fallback = Http::withToken($accessToken)
             ->timeout(15)
-            ->post(self::BASE.'/me/messages', [
+            ->post(self::baseUrl().'/me/messages', [
                 'recipient' => ['id' => $recipientId],
                 'message' => $messageObj,
                 'messaging_type' => 'RESPONSE',
@@ -440,7 +443,7 @@ class InstagramDriver implements ChannelDriverInterface
         try {
             $resp = Http::withToken($pageToken)
                 ->timeout(10)
-                ->get(self::BASE."/{$igsid}", [
+                ->get(self::baseUrl()."/{$igsid}", [
                     'fields' => 'name,username,profile_pic',
                 ]);
 

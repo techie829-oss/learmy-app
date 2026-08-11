@@ -2,7 +2,8 @@
 
 return [
     'meta' => [
-        'graph_url' => env('META_GRAPH_API_URL', 'https://graph.facebook.com/v26.0'),
+        'api_version' => env('META_GRAPH_API_VERSION', 'v26.0'),
+        'graph_url'   => env('META_GRAPH_API_URL', 'https://graph.facebook.com/v26.0'),
     ],
 
     'features' => [

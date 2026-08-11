@@ -185,7 +185,7 @@
                     appId: '{{ e($metaAppId) }}',
                     autoLogAppEvents: true,
                     xfbml: false,
-                    version: 'v20.0',
+                    version: '{{ config("all.meta.api_version", "v26.0") }}',
                 });
                 window.__fbSdkReady = true;
             };
