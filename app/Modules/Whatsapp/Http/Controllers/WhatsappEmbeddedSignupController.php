@@ -42,12 +42,14 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
-        // We will try 3 candidates for redirect_uri, since Meta is extremely strict 
-        // and sometimes behaves unpredictably depending on the App Config.
+        // We will try multiple candidates for redirect_uri, since Meta is extremely strict 
+        // and sometimes behaves unpredictably depending on the App Config and SDK version.
         $candidates = [
             $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 1. Exact setup page
-            rtrim((string) config('app.url'), '/'),                                 // 2. Base domain
-            null,                                                                   // 3. No redirect_uri
+            rtrim((string) config('app.url'), '/'),                                 // 2. Base domain (no slash)
+            rtrim((string) config('app.url'), '/') . '/',                           // 3. Base domain with trailing slash
+            '',                                                                     // 4. Empty string
+            null,                                                                   // 5. No redirect_uri parameter
         ];
 
         $tokenRes = null;
