@@ -1326,6 +1326,7 @@ export default function InboxShow({
     teamMembers = [],
     whatsappTemplates = [],
     channelAccounts = [],
+    hasEcommerceStore = false,
 }) {
     const { t } = useTranslation();
     const { props } = usePage();
