@@ -32,9 +32,6 @@ export default function QRConnectModal({ isOpen, onClose, onConnected }) {
             setStatus(res.data.status);
             setQrImage(res.data.qr);
             setUser(res.data.user);
-            if (res.data.status === 'connected') {
-                if (onConnected) onConnected();
-            }
         } catch (err) {
             console.error('Failed to start QR session:', err);
             setError('Could not connect to WhatsApp QR service. Ensure background service is running.');
@@ -46,11 +43,13 @@ export default function QRConnectModal({ isOpen, onClose, onConnected }) {
     const checkStatus = async () => {
         try {
             const res = await axios.get('/app/whatsapp/qr/status');
+            const prevStatus = status;
             setStatus(res.data.status);
             if (res.data.qr) setQrImage(res.data.qr);
             if (res.data.user) setUser(res.data.user);
 
-            if (res.data.status === 'connected') {
+            // Only auto-close on fresh scan (transition from qr_ready -> connected)
+            if (prevStatus === 'qr_ready' && res.data.status === 'connected') {
                 if (onConnected) onConnected();
             }
         } catch (err) {
