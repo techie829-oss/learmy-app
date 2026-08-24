@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.WA_QR_PORT || 3001;
-const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'http://127.0.0.1:8000/api/webhooks/whatsapp-qr';
+const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'http://127.0.0.1/webhooks/whatsapp-qr';
 const SESSIONS_DIR = path.join(__dirname, '../storage/app/whatsapp-sessions');
 
 if (!fs.existsSync(SESSIONS_DIR)) {
