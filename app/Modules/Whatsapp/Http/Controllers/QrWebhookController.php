@@ -1,0 +1,148 @@
+<?php
+
+namespace App\Modules\Whatsapp\Http\Controllers;
+
+use App\Events\MessageReceived;
+use App\Http\Controllers\Controller;
+use App\Modules\Shared\Models\ChannelAccount;
+use App\Modules\Shared\Models\Conversation;
+use App\Modules\Shared\Models\Message;
+use App\Modules\Shared\Services\ContactService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+class QrWebhookController extends Controller
+{
+    public function __construct(
+        private readonly ContactService $contactService
+    ) {}
+
+    public function handle(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+        $sessionId = $payload['session_id'] ?? null;
+        $event = $payload['event'] ?? null;
+        $data = $payload['data'] ?? [];
+
+        if (! $sessionId || ! $event) {
+            return response()->json(['error' => 'Invalid payload'], 400);
+        }
+
+        // Locate corresponding ChannelAccount by session_id in meta_json
+        $channelAccount = ChannelAccount::where('channel', 'whatsapp')
+            ->where('meta_json->session_id', $sessionId)
+            ->first();
+
+        if (! $channelAccount) {
+            Log::info('QR Webhook received for unlinked session', ['session_id' => $sessionId, 'event' => $event]);
+
+            return response()->json(['status' => 'ignored']);
+        }
+
+        match ($event) {
+            'connected' => $this->handleConnected($channelAccount, $data),
+            'qr_updated' => $this->handleQrUpdated($channelAccount, $data),
+            'disconnected' => $this->handleDisconnected($channelAccount, $data),
+            'inbound_message' => $this->handleInboundMessage($channelAccount, $data),
+            default => null,
+        };
+
+        return response()->json(['status' => 'success']);
+    }
+
+    private function handleConnected(ChannelAccount $account, array $data): void
+    {
+        $meta = $account->meta_json ?? [];
+        $meta['qr_code'] = null;
+        $meta['connected_phone'] = $data['phone'] ?? null;
+        $meta['user_info'] = $data['user'] ?? null;
+
+        $account->update([
+            'status' => 'active',
+            'display_name' => $data['phone'] ? ("WhatsApp (+{$data['phone']})") : $account->display_name,
+            'meta_json' => $meta,
+        ]);
+    }
+
+    private function handleQrUpdated(ChannelAccount $account, array $data): void
+    {
+        $meta = $account->meta_json ?? [];
+        $meta['qr_code'] = $data['qr'] ?? null;
+
+        $account->update([
+            'status' => 'inactive',
+            'meta_json' => $meta,
+        ]);
+    }
+
+    private function handleDisconnected(ChannelAccount $account, array $data): void
+    {
+        $meta = $account->meta_json ?? [];
+        $meta['qr_code'] = null;
+
+        $account->update([
+            'status' => 'inactive',
+            'meta_json' => $meta,
+        ]);
+    }
+
+    private function handleInboundMessage(ChannelAccount $account, array $data): void
+    {
+        $baileysMsg = $data['message'] ?? [];
+        $msgKey = $baileysMsg['key'] ?? [];
+
+        $fromJid = $msgKey['remoteJid'] ?? '';
+        $cleanPhone = explode('@', $fromJid)[0] ?? '';
+        if (empty($cleanPhone)) {
+            return;
+        }
+
+        $phoneE164 = '+'.$cleanPhone;
+        $workspaceId = $account->workspace_id;
+
+        // Upsert contact
+        $contact = $this->contactService->upsert($workspaceId, [
+            'phone_e164' => $phoneE164,
+            'opt_in_whatsapp' => true,
+            'source' => 'whatsapp_qr_inbound',
+        ]);
+
+        // Find or create conversation
+        $conversation = Conversation::firstOrCreate(
+            ['workspace_id' => $workspaceId, 'contact_id' => $contact->id, 'channel_account_id' => $account->id],
+            ['status' => 'open', 'external_thread_id' => $cleanPhone]
+        );
+
+        // Extract body text
+        $msgContent = $baileysMsg['message'] ?? [];
+        $body = $msgContent['conversation']
+            ?? $msgContent['extendedTextMessage']['text']
+            ?? $msgContent['imageMessage']['caption']
+            ?? $msgContent['videoMessage']['caption']
+            ?? '[Media Message]';
+
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'direction' => 'in',
+            'channel' => 'whatsapp',
+            'type' => 'text',
+            'payload' => $baileysMsg,
+            'body' => $body,
+            'status' => 'delivered',
+            'provider_message_id' => $msgKey['id'] ?? null,
+            'sent_by' => 'human',
+            'sent_at' => now(),
+        ]);
+
+        $conversation->update([
+            'last_message_at' => $message->sent_at,
+            'status' => 'open',
+            'unread_count' => $conversation->unread_count + 1,
+            'last_inbound_at' => $message->sent_at,
+        ]);
+
+        // Dispatch event for Automations & AI Chatbot
+        MessageReceived::dispatch($message);
+    }
+}

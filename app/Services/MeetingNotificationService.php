@@ -7,6 +7,7 @@ use App\Modules\Shared\Models\Contact;
 use App\Modules\Shared\Models\ContactTag;
 use App\Modules\Shared\Models\Segment;
 use App\Modules\Whatsapp\Services\CloudApiClient;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class MeetingNotificationService
@@ -21,12 +22,19 @@ class MeetingNotificationService
         $client = CloudApiClient::forWorkspace($workspaceId);
         $contacts = $this->resolveContacts($meeting);
 
-        if (!$client) {
-            Log::warning('MeetingNotificationService: No active WhatsApp client for workspace', ['workspace_id' => $workspaceId]);
+        $hasQrAccount = \App\Modules\Shared\Models\ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('channel', 'whatsapp')
+            ->where('provider', 'qr_baileys')
+            ->where('status', 'active')
+            ->exists();
+
+        if (! $client && ! $hasQrAccount) {
+            Log::warning('MeetingNotificationService: No active WhatsApp client or QR session for workspace', ['workspace_id' => $workspaceId]);
+
             return [
                 'whatsapp_connected' => false,
-                'contacts_count'     => $contacts->count(),
-                'sent_count'         => 0,
+                'contacts_count' => $contacts->count(),
+                'sent_count' => 0,
             ];
         }
 
@@ -56,12 +64,16 @@ class MeetingNotificationService
                     ]
                 ];
 
-                $response = $client->sendTemplate($contact->phone_e164, $templateName, 'en', $components);
-
-                if ($response->successful()) {
-                    $sentCount++;
+                if ($client) {
+                    $response = $client->sendTemplate($contact->phone_e164, $templateName, 'en', $components);
+                    if ($response->successful()) {
+                        $sentCount++;
+                    } else {
+                        Log::error('Meeting notification failed via Meta, trying QR driver', ['phone' => $contact->phone_e164, 'error' => $response->body()]);
+                        $sentCount += $this->sendViaQrDriver($workspaceId, $contact, $meeting);
+                    }
                 } else {
-                    Log::error('Meeting notification failed', ['phone' => $contact->phone_e164, 'error' => $response->body()]);
+                    $sentCount += $this->sendViaQrDriver($workspaceId, $contact, $meeting);
                 }
             } catch (\Exception $e) {
                 Log::error('Meeting notification exception', ['phone' => $contact->phone_e164, 'error' => $e->getMessage()]);
@@ -97,5 +109,30 @@ class MeetingNotificationService
         }
 
         return $allContacts->unique('id')->values();
+    }
+
+    private function sendViaQrDriver(int|string $workspaceId, Contact $contact, Meeting $meeting): int
+    {
+        try {
+            $qrDriver = app(\App\Modules\Whatsapp\Services\WhatsappQrDriver::class);
+            $sessionId = 'workspace_'.$workspaceId.'_qr';
+
+            $text = "📚 *Class Reminder*\n\n"
+                  . "📌 *Subject/Title:* {$meeting->title}\n"
+                  . "🕒 *Time:* {$meeting->start_time->format('Y-m-d H:i')}\n"
+                  . "🔗 *Join Google Meet:* " . ($meeting->meet_link ?? 'TBD') . "\n\n"
+                  . "Please be on time!";
+
+            $res = Http::post(config('services.whatsapp_qr.url', 'http://127.0.0.1:3001') . '/api/messages/send', [
+                'sessionId' => $sessionId,
+                'to'        => $contact->phone_e164,
+                'text'      => $text,
+            ]);
+
+            return $res->successful() ? 1 : 0;
+        } catch (\Throwable $e) {
+            Log::error('sendViaQrDriver failed', ['error' => $e->getMessage()]);
+            return 0;
+        }
     }
 }

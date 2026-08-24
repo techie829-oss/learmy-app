@@ -29,15 +29,28 @@ class WhatsappDriver implements ChannelDriverInterface
         $contact = $conversation->contact;
         $phone = $contact->phone_e164;
 
-        // Prefer the phone number tied to this conversation's channel account so
-        // outbound replies go from the same number the customer wrote to.
-        $phoneNumberId = $conversation->channelAccount?->phone_number_id;
+        $channelAccount = $conversation->channelAccount;
+        if ($channelAccount && $channelAccount->provider === 'qr_baileys') {
+            return app(WhatsappQrDriver::class)->send($message);
+        }
+
+        $phoneNumberId = $channelAccount?->phone_number_id;
         $client = $phoneNumberId
             ? CloudApiClient::forPhoneNumber($phoneNumberId, $conversation->workspace_id)
             : null;
         $client ??= CloudApiClient::forWorkspace($conversation->workspace_id);
 
         if (! $client) {
+            $hasQr = ChannelAccount::where('workspace_id', $conversation->workspace_id)
+                ->where('channel', 'whatsapp')
+                ->where('provider', 'qr_baileys')
+                ->where('status', 'active')
+                ->exists();
+
+            if ($hasQr) {
+                return app(WhatsappQrDriver::class)->send($message);
+            }
+
             throw new \RuntimeException('No active WhatsApp account for workspace.');
         }
 

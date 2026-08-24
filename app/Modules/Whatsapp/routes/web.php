@@ -22,6 +22,11 @@ Route::middleware(['web', 'client-app'])->prefix('app/whatsapp')->name('client.w
     Route::post('/setup/{waba}/phone/{phoneNumberId}/refresh-status', [WhatsappSetupController::class, 'refreshPhoneStatus'])->name('setup.refresh-phone-status');
     Route::post('/setup/{waba}/phone/{phoneNumberId}/change-name', [WhatsappSetupController::class, 'changeDisplayName'])->name('setup.change-display-name');
 
+    // WhatsApp Native QR Engine routes
+    Route::post('/qr/start', [\App\Modules\Whatsapp\Http\Controllers\WhatsappQrController::class, 'start'])->name('qr.start');
+    Route::get('/qr/status', [\App\Modules\Whatsapp\Http\Controllers\WhatsappQrController::class, 'status'])->name('qr.status');
+    Route::post('/qr/logout', [\App\Modules\Whatsapp\Http\Controllers\WhatsappQrController::class, 'logout'])->name('qr.logout');
+
     // Templates
     Route::get('/templates', [WhatsappTemplateController::class, 'index'])->name('templates.index');
     Route::get('/templates/create', [WhatsappTemplateController::class, 'create'])->name('templates.create');

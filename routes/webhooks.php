@@ -31,6 +31,10 @@ Route::middleware('throttle:webhooks')->group(function () {
         Route::post('/{token}', [WhatsappWebhookController::class, 'receive'])->name('receive');
     });
 
+    // ─── WhatsApp Native QR Engine ─────────────────────────────────────────────
+    Route::post('webhooks/whatsapp-qr', [\App\Modules\Whatsapp\Http\Controllers\QrWebhookController::class, 'handle'])
+        ->name('webhooks.whatsapp-qr');
+
     // ─── Meta (Instagram + Messenger) ───────────────────────────────────────────
     Route::prefix('webhooks/meta')->name('webhooks.meta.')->group(function () {
         Route::get('/{token}', [MetaWebhookController::class, 'verify'])->name('verify');

@@ -1,10 +1,13 @@
+import React, { useState } from 'react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, AlertCircle, Calendar, MessageSquare, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Calendar, MessageSquare, ExternalLink, LogOut, ShieldCheck, QrCode, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import QRConnectModal from '@/Components/Whatsapp/QRConnectModal';
 
 export default function ClientIntegrationsIndex({ googleConnected, googleEmail, whatsappConnected, flash }) {
     const { t } = useTranslation();
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
     const handleGoogleConnect = () => {
         window.location.href = route('client.integrations.google.redirect');
@@ -91,6 +94,9 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
                         </div>
                     </div>
 
+                    {/* WhatsApp QR Code Card (Instant 30-Sec Scan) */}
+                    <WhatsAppQRCard />
+
                     {/* Google Calendar & Meet Card */}
                     <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                         <div>
@@ -157,7 +163,48 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
 
                 </div>
 
+                <QRConnectModal
+                    isOpen={isQrModalOpen}
+                    onClose={() => setIsQrModalOpen(false)}
+                    onConnected={() => setIsQrModalOpen(false)}
+                />
+
             </div>
         </ClientLayout>
     );
+
+    function WhatsAppQRCard() {
+        return (
+            <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+                                <QrCode className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg text-neutral-900 dark:text-white flex items-center gap-2">
+                                    WhatsApp QR Code <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">Instant</span>
+                                </h3>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                    Instant 30-Second QR Connection
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-6">
+                        No credit card or Meta Business Manager verification required! Scan the QR code directly from your personal or WhatsApp Business phone to start sending class reminders immediately.
+                    </p>
+                </div>
+                <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                    <button
+                        onClick={() => setIsQrModalOpen(true)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center justify-center gap-2 transition shadow-sm"
+                    >
+                        <QrCode className="h-4 w-4" /> Scan QR Code (Connect WhatsApp)
+                    </button>
+                </div>
+            </div>
+        );
+    }
 }

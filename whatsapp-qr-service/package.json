@@ -1,0 +1,19 @@
+{
+  "name": "learmy-whatsapp-qr-service",
+  "version": "1.0.0",
+  "description": "Native WhatsApp QR Baileys Service for Learmy App",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.15",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "axios": "^1.7.2",
+    "qrcode": "^1.5.3",
+    "ws": "^8.17.1",
+    "pino": "^9.2.0"
+  }
+}

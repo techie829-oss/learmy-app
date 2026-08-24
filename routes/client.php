@@ -50,7 +50,8 @@ Route::middleware(['verified'])->group(function () {
             : null;
 
         $whatsappConnected = $workspaceId
-            ? WhatsappBusinessAccount::where('workspace_id', $workspaceId)->exists()
+            ? (WhatsappBusinessAccount::where('workspace_id', $workspaceId)->exists()
+                || \App\Modules\Shared\Models\ChannelAccount::where('workspace_id', $workspaceId)->where('channel', 'whatsapp')->where('status', 'active')->exists())
             : false;
 
         return Inertia::render('client/Integrations/Index', [
