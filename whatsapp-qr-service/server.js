@@ -133,6 +133,8 @@ async function getOrCreateSession(sessionId) {
     return sessionData;
 }
 
+const WA_QR_SECRET = process.env.WA_QR_SECRET || 'learmy_qr_sec_99812';
+
 async function notifyLaravel(sessionId, event, data) {
     try {
         await axios.post(LARAVEL_WEBHOOK_URL, {
@@ -141,7 +143,10 @@ async function notifyLaravel(sessionId, event, data) {
             data,
             timestamp: Math.floor(Date.now() / 1000)
         }, {
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Learmy-QR-Secret': WA_QR_SECRET
+            },
             timeout: 5000
         });
     } catch (err) {

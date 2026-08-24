@@ -20,6 +20,13 @@ class QrWebhookController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
+        $expectedSecret = env('WA_QR_SECRET', 'learmy_qr_sec_99812');
+        $incomingSecret = $request->header('X-Learmy-QR-Secret');
+
+        if ($expectedSecret && $incomingSecret !== $expectedSecret) {
+            return response()->json(['error' => 'Unauthorized secret token'], 403);
+        }
+
         $payload = $request->all();
         $sessionId = $payload['session_id'] ?? null;
         $event = $payload['event'] ?? null;

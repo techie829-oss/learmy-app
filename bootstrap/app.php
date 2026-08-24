@@ -123,7 +123,15 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->validateCsrfTokens(except: [
-            'webhooks/*',
+            'webhooks/stripe',
+            'webhooks/paypal',
+            'webhooks/paddle',
+            'webhooks/whatsapp/*',
+            'webhooks/whatsapp-qr',
+            'webhooks/meta/*',
+            'webhooks/sms/*',
+            'webhooks/automation/*',
+            'webhooks/ecommerce/*',
             'track/*',
         ]);
     })
