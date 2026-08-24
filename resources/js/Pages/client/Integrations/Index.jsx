@@ -5,7 +5,7 @@ import { CheckCircle2, AlertCircle, Calendar, MessageSquare, ExternalLink, LogOu
 import { useTranslation } from 'react-i18next';
 import QRConnectModal from '@/Components/Whatsapp/QRConnectModal';
 
-export default function ClientIntegrationsIndex({ googleConnected, googleEmail, whatsappConnected, flash }) {
+export default function ClientIntegrationsIndex({ googleConnected, googleEmail, whatsappConnected, qrConnected, qrPhone, flash }) {
     const { t } = useTranslation();
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
@@ -16,6 +16,12 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
     const handleGoogleDisconnect = () => {
         if (confirm('Are you sure you want to disconnect Google Calendar?')) {
             router.post(route('client.integrations.google.disconnect'));
+        }
+    };
+
+    const handleQrDisconnect = () => {
+        if (confirm('Are you sure you want to disconnect WhatsApp QR Account?')) {
+            router.post(route('client.integrations.whatsapp-qr.logout'));
         }
     };
 
@@ -191,18 +197,47 @@ export default function ClientIntegrationsIndex({ googleConnected, googleEmail, 
                                 </p>
                             </div>
                         </div>
+                        {qrConnected ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Connected
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                Not Connected
+                            </span>
+                        )}
                     </div>
                     <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-6">
                         No credit card or Meta Business Manager verification required! Scan the QR code directly from your personal or WhatsApp Business phone to start sending class reminders immediately.
                     </p>
+                    {qrConnected && (
+                        <div className="mb-4 p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                            <span>Connected: <strong>{qrPhone || 'Active Account'}</strong></span>
+                            <button
+                                onClick={handleQrDisconnect}
+                                className="text-rose-600 dark:text-rose-400 font-semibold hover:underline flex items-center gap-1"
+                            >
+                                <LogOut className="h-3.5 w-3.5" /> Disconnect
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800">
-                    <button
-                        onClick={() => setIsQrModalOpen(true)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center justify-center gap-2 transition shadow-sm"
-                    >
-                        <QrCode className="h-4 w-4" /> Scan QR Code (Connect WhatsApp)
-                    </button>
+                    {!qrConnected ? (
+                        <button
+                            onClick={() => setIsQrModalOpen(true)}
+                            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center justify-center gap-2 transition shadow-sm"
+                        >
+                            <QrCode className="h-4 w-4" /> Scan QR Code (Connect WhatsApp)
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setIsQrModalOpen(true)}
+                            className="w-full py-2.5 px-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-medium text-sm flex items-center justify-center gap-2 transition shadow-sm"
+                        >
+                            <QrCode className="h-4 w-4" /> Scan Again / Reconnect
+                        </button>
+                    )}
                 </div>
             </div>
         );

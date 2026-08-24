@@ -51,19 +51,30 @@ Route::middleware(['verified'])->group(function () {
 
         $whatsappConnected = $workspaceId
             ? (WhatsappBusinessAccount::where('workspace_id', $workspaceId)->exists()
-                || \App\Modules\Shared\Models\ChannelAccount::where('workspace_id', $workspaceId)->where('channel', 'whatsapp')->where('status', 'active')->exists())
+                || \App\Modules\Shared\Models\ChannelAccount::where('workspace_id', $workspaceId)->where('channel', 'whatsapp')->where('provider', 'meta')->where('status', 'active')->exists())
             : false;
+
+        $qrAccount = $workspaceId
+            ? \App\Modules\Shared\Models\ChannelAccount::where('workspace_id', $workspaceId)
+                ->where('channel', 'whatsapp')
+                ->where('provider', 'qr_baileys')
+                ->where('status', 'active')
+                ->first()
+            : null;
 
         return Inertia::render('client/Integrations/Index', [
             'googleConnected'    => (bool) $googleToken,
             'googleEmail'        => $googleToken?->email,
             'whatsappConnected'  => $whatsappConnected,
+            'qrConnected'        => (bool) $qrAccount,
+            'qrPhone'            => $qrAccount?->meta_json['connected_phone'] ?? $qrAccount?->display_name,
         ]);
     })->name('integrations.index');
 
     Route::get('/integrations/google/redirect', [ClientGoogleOAuthController::class, 'redirect'])->name('integrations.google.redirect');
     Route::get('/integrations/google/callback', [ClientGoogleOAuthController::class, 'callback'])->name('integrations.google.callback');
     Route::post('/integrations/google/disconnect', [ClientGoogleOAuthController::class, 'disconnect'])->name('integrations.google.disconnect');
+    Route::post('/integrations/whatsapp-qr/logout', [\App\Modules\Whatsapp\Http\Controllers\WhatsappQrController::class, 'logout'])->name('integrations.whatsapp-qr.logout');
 
     // Meetings (Classes)
     Route::resource('meetings', MeetingController::class);

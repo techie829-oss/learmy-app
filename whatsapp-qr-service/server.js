@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
     useMultiFileAuthState,
@@ -18,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.WA_QR_PORT || 3001;
-const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'http://127.0.0.1/webhooks/whatsapp-qr';
+const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'https://learmy.solidrix.com/webhooks/whatsapp-qr';
 const SESSIONS_DIR = path.join(__dirname, '../storage/app/whatsapp-sessions');
 
 if (!fs.existsSync(SESSIONS_DIR)) {
@@ -134,6 +135,7 @@ async function getOrCreateSession(sessionId) {
 }
 
 const WA_QR_SECRET = process.env.WA_QR_SECRET || 'learmy_qr_sec_99812';
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 async function notifyLaravel(sessionId, event, data) {
     try {
@@ -147,6 +149,7 @@ async function notifyLaravel(sessionId, event, data) {
                 'Content-Type': 'application/json',
                 'X-Learmy-QR-Secret': WA_QR_SECRET
             },
+            httpsAgent,
             timeout: 5000
         });
     } catch (err) {
