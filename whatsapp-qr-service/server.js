@@ -10,7 +10,8 @@ import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
+    makeCacheableSignalKeyStore,
+    Browsers
 } from '@whiskeysockets/baileys';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,6 +58,10 @@ async function getOrCreateSession(sessionId) {
         version,
         logger,
         printQRInTerminal: false,
+        browser: Browsers.macOS('Chrome'), // Simulates standard macOS Google Chrome to avoid VPS IP security flags
+        keepAliveIntervalMs: 30000, // Ping socket every 30s to prevent Malaysia VPS TCP drops
+        markOnlineOnConnect: true,
+        syncFullHistory: false, // Prevents loading thousands of old messages which triggers WhatsApp rate limits
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, logger)
@@ -200,6 +205,10 @@ app.post('/api/messages/send', async (req, res) => {
     }
 
     try {
+        // Anti-ban simulation: Add randomized human-like delay (1s to 2.5s) between sends
+        const randomDelay = Math.floor(Math.random() * 1500) + 1000;
+        await new Promise((resolve) => setTimeout(resolve, randomDelay));
+
         // Format phone number to WhatsApp JID format (e.g. 919876543210@s.whatsapp.net)
         const cleanPhone = to.replace(/[^0-9]/g, '');
         const jid = `${cleanPhone}@s.whatsapp.net`;
