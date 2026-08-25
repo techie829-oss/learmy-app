@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
-import { ArrowLeft, Video, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink } from 'lucide-react';
 
-export default function Create({ tags = [], segments = [], workspace_id, meeting }) {
+export default function Create({ tags = [], segments = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
     const isEdit = !!meeting;
 
     const initialTargets = isEdit
@@ -18,14 +18,16 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
     };
 
     const { data, setData, post, put, processing, errors } = useForm({
-        workspace_id:     workspace_id,
-        title:            isEdit ? meeting.title : '',
-        description:      isEdit ? (meeting.description ?? '') : '',
-        start_time:       isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
-        end_time:         isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
-        timezone:         isEdit ? meeting.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
-        custom_meet_link: isEdit ? (meeting.meet_link ?? '') : '',
-        targets:          initialTargets,
+        workspace_id:                workspace_id,
+        title:                       isEdit ? meeting.title : '',
+        description:                 isEdit ? (meeting.description ?? '') : '',
+        start_time:                  isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
+        end_time:                    isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
+        timezone:                    isEdit ? meeting.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+        custom_meet_link:            isEdit ? (meeting.meet_link ?? '') : '',
+        targets:                     initialTargets,
+        whatsapp_template:           isEdit ? (meeting.whatsapp_template ?? '') : '',
+        send_whatsapp_notification:  isEdit ? (meeting.send_whatsapp_notification ?? true) : true,
     });
 
     const [selectedTargets, setSelectedTargets] = useState(initialTargets);
@@ -225,6 +227,83 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
                                 </p>
                             )}
                             {errors.targets && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.targets}</p>}
+                        </div>
+
+                        {/* WhatsApp Notification Section */}
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800/40 dark:bg-green-900/10">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+                                            📱 WhatsApp Reminder Notification
+                                        </p>
+                                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                                            Jab class schedule hogi, selected batches ko WhatsApp reminder jaayega.
+                                        </p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={data.send_whatsapp_notification}
+                                        onChange={e => setData('send_whatsapp_notification', e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                </label>
+                            </div>
+
+                            {data.send_whatsapp_notification && (
+                                <div className="mt-4 space-y-3">
+                                    {!whatsappConnected && (
+                                        <div className="rounded-md bg-amber-50 border border-amber-200 p-3 dark:bg-amber-900/20 dark:border-amber-700">
+                                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                                                ⚠️ WhatsApp connected nahi hai.{' '}
+                                                <Link
+                                                    href={route('integrations.index')}
+                                                    className="font-semibold underline"
+                                                >
+                                                    Integrations mein connect karo
+                                                </Link>
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Template Selector */}
+                                    {waTemplates.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-green-800 dark:text-green-300 mb-1">
+                                                WhatsApp Template
+                                            </label>
+                                            <select
+                                                value={data.whatsapp_template}
+                                                onChange={e => setData('whatsapp_template', e.target.value)}
+                                                className="block w-full rounded-md border-green-300 bg-white text-sm shadow-sm focus:border-green-500 focus:ring-green-500 dark:border-green-700 dark:bg-neutral-700 dark:text-white"
+                                            >
+                                                <option value="">Default Class Reminder (built-in QR message)</option>
+                                                {waTemplates.map(t => (
+                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                ))}
+                                            </select>
+                                            <p className="mt-1 text-xs text-green-600 dark:text-green-500">
+                                                Empty = default rich reminder with class title, time, and meet link.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Import Groups Link */}
+                                    <div className="pt-1">
+                                        <Link
+                                            href={route('whatsapp.groups.index')}
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 hover:underline"
+                                        >
+                                            <ExternalLink className="h-3 w-3" />
+                                            WhatsApp Groups se contacts import karo → Tag assign karo
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Description */}

@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\CheckoutController;
 use App\Modules\Whatsapp\Models\WhatsappBusinessAccount;
+use App\Modules\Whatsapp\Http\Controllers\WhatsappGroupController;
 use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\Client\ApiTokenController;
 use App\Http\Controllers\Client\AuditLogController as ClientAuditLogController;
@@ -75,6 +76,11 @@ Route::middleware(['verified'])->group(function () {
     Route::get('/integrations/google/callback', [ClientGoogleOAuthController::class, 'callback'])->name('integrations.google.callback');
     Route::post('/integrations/google/disconnect', [ClientGoogleOAuthController::class, 'disconnect'])->name('integrations.google.disconnect');
     Route::post('/integrations/whatsapp-qr/logout', [\App\Modules\Whatsapp\Http\Controllers\WhatsappQrController::class, 'logout'])->name('integrations.whatsapp-qr.logout');
+
+    // WhatsApp Group Import
+    Route::get('/whatsapp/groups', [WhatsappGroupController::class, 'index'])->name('whatsapp.groups.index');
+    Route::get('/whatsapp/groups/{groupId}/participants', [WhatsappGroupController::class, 'participants'])->name('whatsapp.groups.participants');
+    Route::post('/whatsapp/groups/import', [WhatsappGroupController::class, 'import'])->name('whatsapp.groups.import');
 
     // Meetings (Classes)
     Route::resource('meetings', MeetingController::class);

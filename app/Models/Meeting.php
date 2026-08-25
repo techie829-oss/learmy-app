@@ -16,12 +16,16 @@ class Meeting extends Model
         'google_event_id',
         'meet_link',
         'status',
+        'whatsapp_template',
+        'send_whatsapp_notification',
     ];
 
     protected $casts = [
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
+        'start_time'                 => 'datetime',
+        'end_time'                   => 'datetime',
+        'send_whatsapp_notification' => 'boolean',
     ];
+
 
     public function targets()
     {

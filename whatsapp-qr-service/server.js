@@ -368,6 +368,78 @@ app.post('/api/messages/send-template', async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp Groups: List all groups for a session
+// GET /api/groups?sessionId=workspace_3_qr
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/groups', async (req, res) => {
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+    const session = activeSessions.get(sessionId);
+    if (!session || session.status !== 'connected' || !session.sock) {
+        return res.status(400).json({ error: 'Session is not connected' });
+    }
+
+    try {
+        // Fetch all chats and filter groups (JID ends with @g.us)
+        const chats = await session.sock.groupFetchAllParticipating();
+        const groups = Object.values(chats).map((g) => ({
+            id:            g.id,
+            name:          g.subject || 'Unnamed Group',
+            description:   g.desc || '',
+            participantCount: (g.participants || []).length,
+            creation:      g.creation,
+        }));
+
+        res.json({ success: true, groups });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp Groups: Get participants of a specific group
+// GET /api/groups/:groupId/participants?sessionId=workspace_3_qr
+// groupId must be URL-encoded (e.g. 120363XXXX@g.us → 120363XXXX%40g.us)
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/groups/:groupId/participants', async (req, res) => {
+    const { sessionId } = req.query;
+    const groupId = decodeURIComponent(req.params.groupId);
+
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+    const session = activeSessions.get(sessionId);
+    if (!session || session.status !== 'connected' || !session.sock) {
+        return res.status(400).json({ error: 'Session is not connected' });
+    }
+
+    try {
+        const metadata = await session.sock.groupMetadata(groupId);
+        const participants = (metadata.participants || []).map((p) => {
+            // JID format: 919876543210:4@s.whatsapp.net or 919876543210@s.whatsapp.net
+            const phone = p.id.split(':')[0].split('@')[0];
+            return {
+                jid:   p.id,
+                phone: `+${phone}`,
+                admin: p.admin === 'admin' || p.admin === 'superadmin',
+            };
+        });
+
+        res.json({
+            success: true,
+            group: {
+                id:          metadata.id,
+                name:        metadata.subject,
+                description: metadata.desc || '',
+                participants,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Learmy WhatsApp QR Engine listening on port ${PORT}`);
 });

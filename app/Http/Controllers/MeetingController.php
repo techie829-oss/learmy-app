@@ -6,8 +6,10 @@ use App\Models\Meeting;
 use App\Models\MeetingTarget;
 use App\Modules\Integrations\Services\Clients\GoogleClient;
 use App\Services\MeetingNotificationService;
+use App\Modules\Shared\Models\ChannelAccount;
 use App\Modules\Shared\Models\ContactTag;
 use App\Modules\Shared\Models\Segment;
+use App\Modules\Whatsapp\Models\WhatsappTemplate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,28 +34,41 @@ class MeetingController extends Controller
     public function create(Request $request)
     {
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
-        $tags = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
-        $segments = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $tags        = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $segments    = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
+
+        // WhatsApp templates for notification selector
+        $waTemplates = $this->getWhatsappTemplates($workspaceId);
+
+        // Check if QR or Meta WhatsApp is connected
+        $whatsappConnected = ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('channel', 'whatsapp')
+            ->where('status', 'active')
+            ->exists();
 
         return Inertia::render('client/Meetings/Create', [
-            'tags' => $tags,
-            'segments' => $segments,
-            'workspace_id' => $workspaceId,
+            'tags'               => $tags,
+            'segments'           => $segments,
+            'workspace_id'       => $workspaceId,
+            'waTemplates'        => $waTemplates,
+            'whatsappConnected'  => $whatsappConnected,
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title'            => 'required|string|max:255',
-            'description'      => 'nullable|string',
-            'start_time'       => 'required|date',
-            'end_time'         => 'required|date|after:start_time',
-            'timezone'         => 'nullable|string|timezone',
-            'custom_meet_link' => 'nullable|url',
-            'targets'          => 'nullable|array',
-            'targets.*.type'   => 'required_with:targets|string',
-            'targets.*.id'     => 'required_with:targets|integer',
+            'title'                      => 'required|string|max:255',
+            'description'                => 'nullable|string',
+            'start_time'                 => 'required|date',
+            'end_time'                   => 'required|date|after:start_time',
+            'timezone'                   => 'nullable|string|timezone',
+            'custom_meet_link'           => 'nullable|url',
+            'whatsapp_template'          => 'nullable|string|max:128',
+            'send_whatsapp_notification' => 'nullable|boolean',
+            'targets'                    => 'nullable|array',
+            'targets.*.type'             => 'required_with:targets|string',
+            'targets.*.id'               => 'required_with:targets|integer',
         ]);
 
         // Always use the authenticated user's workspace — never trust client-supplied workspace_id.
@@ -98,15 +113,17 @@ class MeetingController extends Controller
 
             // Create Meeting
             $meeting = Meeting::create([
-                'workspace_id'    => $workspaceId,
-                'title'           => $validated['title'],
-                'description'     => $validated['description'] ?? null,
-                'start_time'      => $validated['start_time'],
-                'end_time'        => $validated['end_time'],
-                'timezone'        => $validated['timezone'] ?? 'UTC',
-                'google_event_id' => $googleEventId,
-                'meet_link'       => $meetLink,
-                'status'          => 'scheduled',
+                'workspace_id'               => $workspaceId,
+                'title'                      => $validated['title'],
+                'description'                => $validated['description'] ?? null,
+                'start_time'                 => $validated['start_time'],
+                'end_time'                   => $validated['end_time'],
+                'timezone'                   => $validated['timezone'] ?? 'UTC',
+                'google_event_id'            => $googleEventId,
+                'meet_link'                  => $meetLink,
+                'status'                     => 'scheduled',
+                'whatsapp_template'          => $validated['whatsapp_template'] ?? null,
+                'send_whatsapp_notification' => $validated['send_whatsapp_notification'] ?? true,
             ]);
 
             // Save Smart Mapping Targets
@@ -206,5 +223,35 @@ class MeetingController extends Controller
         $meeting->delete();
 
         return redirect()->route('client.meetings.index')->with('success', 'Meeting deleted.');
+    }
+
+    /**
+     * Fetch WhatsApp templates for this workspace (QR free-text or Meta approved templates).
+     */
+    private function getWhatsappTemplates(int $workspaceId): array
+    {
+        // Try to load from WhatsappTemplate model (Meta approved templates)
+        try {
+            $templates = WhatsappTemplate::where('workspace_id', $workspaceId)
+                ->where('status', 'APPROVED')
+                ->get(['id', 'name', 'display_name'])
+                ->map(fn($t) => [
+                    'value' => $t->name,
+                    'label' => $t->display_name ?? $t->name,
+                ])
+                ->toArray();
+
+            // Always prepend the default class reminder template
+            array_unshift($templates, [
+                'value' => 'class_scheduled_notification',
+                'label' => 'Default Class Reminder (built-in)',
+            ]);
+
+            return $templates;
+        } catch (\Throwable $e) {
+            return [
+                ['value' => 'class_scheduled_notification', 'label' => 'Default Class Reminder (built-in)'],
+            ];
+        }
     }
 }
