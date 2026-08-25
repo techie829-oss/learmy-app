@@ -122,6 +122,31 @@ async function getOrCreateSession(sessionId) {
         }
     });
 
+    const lidMap = sessionData.lidMap || new Map();
+    sessionData.lidMap = lidMap;
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+        for (const c of contacts) {
+            if (c.id && c.lid && c.id.endsWith('@s.whatsapp.net')) {
+                const phone = c.id.split('@')[0];
+                const cleanLid = c.lid.split('@')[0];
+                lidMap.set(c.lid, phone);
+                lidMap.set(cleanLid, phone);
+            }
+        }
+    });
+
+    sock.ev.on('contacts.update', (updates) => {
+        for (const c of updates) {
+            if (c.id && c.lid && c.id.endsWith('@s.whatsapp.net')) {
+                const phone = c.id.split('@')[0];
+                const cleanLid = c.lid.split('@')[0];
+                lidMap.set(c.lid, phone);
+                lidMap.set(cleanLid, phone);
+            }
+        }
+    });
+
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         for (const msg of messages) {
             if (!msg.message || msg.key.fromMe) continue;
@@ -133,7 +158,12 @@ async function getOrCreateSession(sessionId) {
 
             // Handle WhatsApp LID (Linked Identity ID e.g. 32495856832586@lid)
             if (senderJid.endsWith('@lid')) {
-                if (msg.key.participant && msg.key.participant.endsWith('@s.whatsapp.net')) {
+                const rawLid = senderJid.split('@')[0];
+                if (lidMap.has(senderJid)) {
+                    senderJid = `${lidMap.get(senderJid)}@s.whatsapp.net`;
+                } else if (lidMap.has(rawLid)) {
+                    senderJid = `${lidMap.get(rawLid)}@s.whatsapp.net`;
+                } else if (msg.key.participant && msg.key.participant.endsWith('@s.whatsapp.net')) {
                     senderJid = msg.key.participant;
                 } else if (msg.participant && msg.participant.endsWith('@s.whatsapp.net')) {
                     senderJid = msg.participant;
