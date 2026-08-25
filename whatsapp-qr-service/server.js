@@ -473,6 +473,25 @@ app.get('/api/groups/:groupId/participants', async (req, res) => {
     }
 });
 
+function autoRestoreSessions() {
+    try {
+        if (!fs.existsSync(SESSIONS_DIR)) return;
+        const entries = fs.readdirSync(SESSIONS_DIR);
+        for (const entry of entries) {
+            const sessionPath = path.join(SESSIONS_DIR, entry);
+            if (fs.statSync(sessionPath).isDirectory()) {
+                console.log(`[Auto Restore] Restoring QR session: ${entry}`);
+                getOrCreateSession(entry).catch((err) => {
+                    console.error(`[Auto Restore Error] Session ${entry}:`, err.message);
+                });
+            }
+        }
+    } catch (err) {
+        console.error('[Auto Restore Error]', err.message);
+    }
+}
+
 app.listen(PORT, () => {
     console.log(`🚀 Learmy WhatsApp QR Engine listening on port ${PORT}`);
+    autoRestoreSessions();
 });
