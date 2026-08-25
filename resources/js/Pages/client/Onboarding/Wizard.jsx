@@ -4,12 +4,12 @@ import { CheckCircle, Circle, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const STEP_LINKS = {
-    verify_email:                  null,
-    connect_first_channel:         'client.whatsapp.setup',
-    import_first_contacts:         'client.contacts.index',
-    send_first_message:            'client.campaigns.create',
-    train_first_chatbot:           'client.ai.chatbots.index',
-    connect_first_social_account:  'client.social.accounts.index',
+    verify_email:          null,
+    connect_first_channel: 'client.whatsapp.setup',
+    import_first_contacts: 'client.contacts.index',
+    schedule_first_meeting: 'client.meetings.index',
+    send_first_message:    'client.campaigns.create',
+    train_first_chatbot:   'client.ai.chatbots.index',
 };
 
 export default function OnboardingWizard({ progress }) {

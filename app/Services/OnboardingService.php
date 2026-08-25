@@ -16,9 +16,9 @@ class OnboardingService
         'verify_email' => 'Verify your email address',
         'connect_first_channel' => 'Connect your first messaging channel',
         'import_first_contacts' => 'Import or add your first contacts',
+        'schedule_first_meeting' => 'Schedule your first meeting or live class',
         'send_first_message' => 'Send your first message',
         'train_first_chatbot' => 'Train an AI chatbot',
-        'connect_first_social_account' => 'Connect a social media account',
     ];
 
     public function getProgress(User $user): array
@@ -88,13 +88,13 @@ class OnboardingService
                     $q->where('workspace_id', $workspaceId);
                 })->where('direction', 'out')->exists(),
 
+            'schedule_first_meeting' => $workspaceId !== null &&
+                \App\Models\Meeting::where('workspace_id', $workspaceId)->exists(),
+
             'train_first_chatbot' => $workspaceId !== null &&
                 AiChatbot::where('workspace_id', $workspaceId)
                     ->where('enabled', true)
                     ->exists(),
-
-            'connect_first_social_account' => $workspaceId !== null &&
-                SocialAccount::where('workspace_id', $workspaceId)->exists(),
 
             default => false,
         };

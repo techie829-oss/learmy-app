@@ -96,7 +96,8 @@ export default function Topbar({
         user &&
         !page.props.auth?.adminUser &&
         onboardingSummary &&
-        !onboardingSummary.is_complete;
+        !onboardingSummary.is_complete &&
+        !route().current('client.onboarding.show');
 
     const handleWorkspaceSwitch = (workspaceId) => {
         router.post(route('client.workspaces.switch'), { workspace_id: workspaceId }, { preserveScroll: true });
