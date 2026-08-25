@@ -34,7 +34,7 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
         description:                 isEdit ? (meeting.description ?? '') : '',
         start_time:                  isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
         end_time:                    isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
-        timezone:                    isEdit ? meeting.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone:                    isEdit ? (meeting.timezone || 'Asia/Kolkata') : (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata' : 'Asia/Kolkata'),
         custom_meet_link:            isEdit ? (meeting.meet_link ?? '') : '',
         targets:                     initialTargets,
         whatsapp_template:           isEdit ? (meeting.whatsapp_template ?? '') : '',
