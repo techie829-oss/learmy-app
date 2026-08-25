@@ -40,9 +40,9 @@ class SettingsController extends Controller
         return Inertia::render('client/Settings/Index', [
             'preferences' => [
                 'locale' => $user->locale ?? config('app.locale', 'en'),
-                'display_currency' => $user->display_currency ?? 'USD',
+                'display_currency' => $user->display_currency ?? 'INR',
                 'theme' => $user->theme ?? 'light',
-                'timezone' => $user->timezone ?? 'Asia/Dhaka',
+                'timezone' => $user->timezone ?? 'Asia/Kolkata',
             ],
             'supportedLocales' => $supportedLocales->map(fn ($l) => ['code' => $l->code, 'name' => $l->name]),
             'supportedCurrencies' => $supportedCurrencies->map(fn ($c) => ['code' => $c->code, 'name' => $c->code, 'symbol' => $c->symbol ?? $c->code]),
@@ -70,7 +70,7 @@ class SettingsController extends Controller
     {
         $user = $request->user();
         $localeCodes = Locale::enabled()->pluck('code')->all() ?: ['en'];
-        $currencyCodes = Currency::where('enabled', true)->pluck('code')->all() ?: ['USD'];
+        $currencyCodes = Currency::where('enabled', true)->pluck('code')->all() ?: ['INR', 'USD'];
 
         $validated = $request->validate([
             'locale' => ['nullable', 'string', 'max:16', Rule::in($localeCodes)],
