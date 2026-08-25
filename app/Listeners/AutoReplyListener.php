@@ -59,7 +59,30 @@ class AutoReplyListener
     {
         $message = $event->message;
 
+        // ── Security Guard 1: Only process genuine INBOUND messages ──────────
         if ($message->direction !== 'in') {
+            return;
+        }
+
+        // ── Security Guard 2: Never process messages sent by bot (anti-loop) ─
+        // Prevents bot's own replies from re-triggering auto-reply chains.
+        if (($message->sent_by ?? '') === 'bot') {
+            return;
+        }
+
+        // ── Security Guard 3: fromMe flag from Baileys/WhatsApp Web payload ──
+        // WhatsApp Web marks messages sent FROM our own device as fromMe=true.
+        // These must NEVER trigger auto-replies (prevents self-reply loops).
+        $rawPayload = $message->payload ?? [];
+        $baileysKey = is_array($rawPayload) ? ($rawPayload['key'] ?? []) : [];
+        if (!empty($baileysKey['fromMe'])) {
+            Log::debug('AutoReplyListener: skipping fromMe message', ['message_id' => $message->id]);
+            return;
+        }
+
+        // ── Security Guard 4: Ignore empty / whitespace-only messages ─────────
+        $rawBody = $message->body ?? '';
+        if (trim($rawBody) === '' || $rawBody === '[Media Message]') {
             return;
         }
 
@@ -74,6 +97,19 @@ class AutoReplyListener
             return;
         }
 
+        // ── Security Guard 5: Per-conversation auto-reply rate limit ──────────
+        // Max 10 auto-replies per conversation per hour to prevent spam abuse.
+        // If a contact keeps sending messages, we stop auto-replying after 10.
+        $convRateKey = "auto_reply_rate:{$conversation->id}";
+        $convReplyCount = (int) Cache::get($convRateKey, 0);
+        if ($convReplyCount >= 10) {
+            Log::warning('AutoReplyListener: rate limit reached for conversation', [
+                'conversation_id' => $conversation->id,
+                'count' => $convReplyCount,
+            ]);
+            return;
+        }
+
         // ── 1. Keyword / trigger auto-reply rules (always run, no chatbot required) ──
         $autoReply = $this->findMatchingAutoReply(
             $conversation->workspace_id,
@@ -84,6 +120,8 @@ class AutoReplyListener
         );
 
         if ($autoReply) {
+            // Increment rate limiter before dispatching
+            Cache::put($convRateKey, $convReplyCount + 1, now()->addHour());
             $this->dispatchAutoReply($autoReply, $message, $conversation);
 
             return;

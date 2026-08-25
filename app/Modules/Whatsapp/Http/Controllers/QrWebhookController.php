@@ -100,6 +100,17 @@ class QrWebhookController extends Controller
         $baileysMsg = $data['message'] ?? [];
         $msgKey = $baileysMsg['key'] ?? [];
 
+        // ── Security: Skip messages sent FROM our own device (WhatsApp Web) ──
+        // fromMe=true means we sent it; storing and triggering auto-reply would
+        // cause an infinite self-reply loop.
+        if (!empty($msgKey['fromMe'])) {
+            Log::debug('QrWebhook: ignoring fromMe outbound message', [
+                'session_id' => $account->meta_json['session_id'] ?? null,
+                'msg_id'     => $msgKey['id'] ?? null,
+            ]);
+            return;
+        }
+
         $fromJid = $msgKey['remoteJid'] ?? '';
         $cleanPhone = !empty($data['phone']) ? $data['phone'] : (explode('@', $fromJid)[0] ?? '');
         if (empty($cleanPhone)) {
