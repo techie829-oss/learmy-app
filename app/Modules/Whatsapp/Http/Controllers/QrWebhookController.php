@@ -107,51 +107,27 @@ class QrWebhookController extends Controller
         }
 
         $workspaceId = $account->workspace_id;
+        $phoneE164 = str_starts_with($cleanPhone, '+') ? $cleanPhone : '+'.$cleanPhone;
 
-        // Check if $cleanPhone is a WhatsApp LID (Linked Identity ID e.g., 14+ digits or starting with 3249/2683)
-        $isLid = strlen($cleanPhone) >= 14 || str_starts_with($cleanPhone, '3249') || str_ends_with($fromJid, '@lid');
+        // Upsert contact with exact phone or LID identity
+        $contact = $this->contactService->upsert($workspaceId, [
+            'phone_e164' => $phoneE164,
+            'opt_in_whatsapp' => true,
+            'source' => 'whatsapp_qr_inbound',
+        ]);
 
-        if ($isLid) {
-            // Never create a new fake contact for LID! Map to existing real phone contact in workspace
-            $contact = \App\Modules\Shared\Models\Contact::where('workspace_id', $workspaceId)
-                ->where('phone_e164', 'not like', '+3249%')
-                ->whereRaw('LENGTH(phone_e164) <= 14')
-                ->orderByDesc('updated_at')
-                ->first();
-
-            if (! $contact) {
-                $connPhone = $account->meta_json['connected_phone'] ?? null;
-                $phoneE164 = $connPhone ? (str_starts_with($connPhone, '+') ? $connPhone : '+'.$connPhone) : (str_starts_with($cleanPhone, '+') ? $cleanPhone : '+'.$cleanPhone);
-                $contact = $this->contactService->upsert($workspaceId, [
-                    'phone_e164' => $phoneE164,
-                    'opt_in_whatsapp' => true,
-                    'source' => 'whatsapp_qr_inbound',
-                ]);
-            }
-        } else {
-            $phoneE164 = str_starts_with($cleanPhone, '+') ? $cleanPhone : '+'.$cleanPhone;
-            $contact = $this->contactService->upsert($workspaceId, [
-                'phone_e164' => $phoneE164,
-                'opt_in_whatsapp' => true,
-                'source' => 'whatsapp_qr_inbound',
-            ]);
-        }
-
-        // Single unified conversation per contact & channel_account
-        $conversation = Conversation::where('workspace_id', $workspaceId)
-            ->where('contact_id', $contact->id)
-            ->where('channel_account_id', $account->id)
-            ->first();
-
-        if (! $conversation) {
-            $conversation = Conversation::create([
+        // Find or create single unified conversation for this contact and channel account
+        $conversation = Conversation::firstOrCreate(
+            [
                 'workspace_id' => $workspaceId,
                 'contact_id' => $contact->id,
                 'channel_account_id' => $account->id,
+            ],
+            [
                 'status' => 'open',
-                'external_thread_id' => $contact->phone_e164,
-            ]);
-        }
+                'external_thread_id' => $cleanPhone,
+            ]
+        );
 
         // Extract body text
         $msgContent = $baileysMsg['message'] ?? [];
