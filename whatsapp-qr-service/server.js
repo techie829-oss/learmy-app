@@ -136,8 +136,13 @@ async function getOrCreateSession(sessionId) {
                     lidMap.set(c.lid, phone);
                     lidMap.set(cleanLid, phone);
                     console.log(`[LID Map] ${c.lid} → +${phone}`);
+                    // Notify Laravel to merge any contact saved under LID to real phone
+                    notifyLaravel(sessionId, 'lid_resolved', {
+                        lid: cleanLid,
+                        phone: phone,
+                        name: c.name || c.notify || null
+                    });
                 }
-                // Also map phone to phone (normalise)
                 lidMap.set(c.id, phone);
             }
         }
@@ -152,6 +157,11 @@ async function getOrCreateSession(sessionId) {
                     lidMap.set(c.lid, phone);
                     lidMap.set(cleanLid, phone);
                     console.log(`[LID Map Updated] ${c.lid} → +${phone}`);
+                    notifyLaravel(sessionId, 'lid_resolved', {
+                        lid: cleanLid,
+                        phone: phone,
+                        name: c.name || c.notify || null
+                    });
                 }
                 lidMap.set(c.id, phone);
             }

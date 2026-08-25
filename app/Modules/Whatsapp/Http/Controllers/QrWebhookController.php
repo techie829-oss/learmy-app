@@ -52,6 +52,7 @@ class QrWebhookController extends Controller
             'qr_updated' => $this->handleQrUpdated($channelAccount, $data),
             'disconnected' => $this->handleDisconnected($channelAccount, $data),
             'inbound_message' => $this->handleInboundMessage($channelAccount, $data),
+            'lid_resolved' => $this->handleLidResolved($channelAccount, $data),
             default => null,
         };
 
@@ -151,5 +152,58 @@ class QrWebhookController extends Controller
 
         // Dispatch event for Automations & AI Chatbot
         MessageReceived::dispatch($message);
+    }
+
+    /**
+     * When WhatsApp resolves a LID → real phone number,
+     * find contacts stored under the LID and update them to the real phone.
+     */
+    private function handleLidResolved(ChannelAccount $account, array $data): void
+    {
+        $lid = $data['lid'] ?? null;
+        $phone = $data['phone'] ?? null;
+        $name = $data['name'] ?? null;
+
+        if (! $lid || ! $phone) {
+            return;
+        }
+
+        $workspaceId = $account->workspace_id;
+        $realPhone = str_starts_with($phone, '+') ? $phone : '+'.$phone;
+        $lidPhone = str_starts_with($lid, '+') ? $lid : '+'.$lid;
+
+        Log::info('[LID Resolved] Merging contact', [
+            'lid' => $lidPhone,
+            'real_phone' => $realPhone,
+            'workspace' => $workspaceId,
+        ]);
+
+        // Find contact stored under LID
+        $lidContact = $this->contactService->upsert($workspaceId, [
+            'phone_e164' => $lidPhone,
+        ]);
+
+        // Upsert real phone contact
+        $realContact = $this->contactService->upsert($workspaceId, [
+            'phone_e164' => $realPhone,
+            'opt_in_whatsapp' => true,
+            'source' => 'whatsapp_qr_inbound',
+            'first_name' => $name ?? $realContact->first_name ?? null,
+        ]);
+
+        if ($lidContact && $realContact && $lidContact->id !== $realContact->id) {
+            // Migrate all conversations from LID contact to real phone contact
+            Conversation::where('workspace_id', $workspaceId)
+                ->where('contact_id', $lidContact->id)
+                ->update(['contact_id' => $realContact->id]);
+
+            // Delete the LID contact
+            $lidContact->delete();
+
+            Log::info('[LID Resolved] Merged conversations', [
+                'from_contact' => $lidContact->id,
+                'to_contact' => $realContact->id,
+            ]);
+        }
     }
 }
