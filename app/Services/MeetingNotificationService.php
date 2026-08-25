@@ -214,7 +214,16 @@ class MeetingNotificationService
             $dateTime  = $meeting->start_time->format('d M Y, h:i A');
             $meetLink  = $meeting->meet_link ?? 'TBD';
 
-            $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink);
+            $dbTemplate = WhatsappTemplate::where('workspace_id', $qrAccount->workspace_id)
+                ->where('name', $templateName)
+                ->first();
+
+            if ($dbTemplate && !empty($dbTemplate->components)) {
+                $dummyContact = new Contact(['first_name' => 'Students', 'full_name' => 'Students']);
+                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting);
+            } else {
+                $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink);
+            }
 
             $payload = [
                 'sessionId' => $sessionId,
