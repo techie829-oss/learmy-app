@@ -109,13 +109,9 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
     const submit = (e) => {
         e.preventDefault();
         if (isEdit) {
-            put(route('client.meetings.update', meeting.id), {
-                onSuccess: () => router.visit(route('client.meetings.index')),
-            });
+            put(route('client.meetings.update', meeting.id));
         } else {
-            post(route('client.meetings.store'), {
-                onSuccess: () => router.visit(route('client.meetings.index')),
-            });
+            post(route('client.meetings.store'));
         }
     };
 
