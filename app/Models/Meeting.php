@@ -20,6 +20,7 @@ class Meeting extends Model
         'send_whatsapp_notification',
         'reminder_settings',
         'reminded_morning_at',
+        'reminded_15m_at',
         'reminded_start_at',
     ];
 
@@ -29,6 +30,7 @@ class Meeting extends Model
         'send_whatsapp_notification' => 'boolean',
         'reminder_settings'          => 'array',
         'reminded_morning_at'        => 'datetime',
+        'reminded_15m_at'            => 'datetime',
         'reminded_start_at'          => 'datetime',
     ];
 
