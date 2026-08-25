@@ -262,6 +262,112 @@ app.post('/api/sessions/logout', async (req, res) => {
     res.json({ success: true, status: 'logged_out' });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Send Rich Template Message (Header image/text + Body + Footer + Buttons)
+// Supports WhatsApp-style template structure via Baileys
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/messages/send-template', async (req, res) => {
+    /**
+     * Request body shape:
+     * {
+     *   sessionId: 'workspace_3_qr',
+     *   to: '+917007420572',
+     *   template: {
+     *     header: { type: 'text'|'image'|'video', text: '...', url: '...' },
+     *     body: 'Hello *Name*! Rendered body text.',
+     *     footer: 'Powered by Learmy',
+     *     buttons: [
+     *       { type: 'url',        text: 'Visit Website', value: 'https://...' },
+     *       { type: 'quickReply', text: 'Yes, Interested' },
+     *       { type: 'call',       text: 'Call Now',       value: '+91...' }
+     *     ]
+     *   }
+     * }
+     */
+    const { sessionId, to, template } = req.body;
+
+    if (!sessionId || !to || !template) {
+        return res.status(400).json({ error: 'sessionId, to, and template are required' });
+    }
+
+    const session = activeSessions.get(sessionId);
+    if (!session || session.status !== 'connected' || !session.sock) {
+        return res.status(400).json({ error: 'Session is not connected' });
+    }
+
+    try {
+        // Anti-ban delay
+        const randomDelay = Math.floor(Math.random() * 1500) + 1000;
+        await new Promise((resolve) => setTimeout(resolve, randomDelay));
+
+        const cleanPhone = to.replace(/[^0-9]/g, '');
+        const jid = `${cleanPhone}@s.whatsapp.net`;
+
+        const { header, body, footer, buttons = [] } = template;
+
+        // ── Build formatted button lines ──────────────────────────────────────
+        const buttonLines = buttons.map((btn) => {
+            if (btn.type === 'url')        return `🔗 ${btn.text}: ${btn.value || ''}`;
+            if (btn.type === 'call')       return `📞 ${btn.text}: ${btn.value || ''}`;
+            if (btn.type === 'quickReply') return `👉 ${btn.text}`;
+            return `• ${btn.text}`;
+        }).join('\n');
+
+        let result;
+
+        // ── Image header: send image first, then body+footer+buttons as caption ──
+        if (header && header.type === 'image' && header.url) {
+            const captionParts = [];
+            if (body)        captionParts.push(body);
+            if (footer)      captionParts.push(`_${footer}_`);
+            if (buttonLines) captionParts.push(`\n${buttonLines}`);
+
+            result = await session.sock.sendMessage(jid, {
+                image: { url: header.url },
+                caption: captionParts.join('\n\n'),
+                jpegThumbnail: null
+            });
+        }
+
+        // ── Video header ──────────────────────────────────────────────────────
+        else if (header && header.type === 'video' && header.url) {
+            const captionParts = [];
+            if (body)        captionParts.push(body);
+            if (footer)      captionParts.push(`_${footer}_`);
+            if (buttonLines) captionParts.push(`\n${buttonLines}`);
+
+            result = await session.sock.sendMessage(jid, {
+                video: { url: header.url },
+                caption: captionParts.join('\n\n')
+            });
+        }
+
+        // ── Text-only / No header ─────────────────────────────────────────────
+        else {
+            const textParts = [];
+            if (header && header.type === 'text' && header.text) {
+                textParts.push(`*${header.text}*`);
+            }
+            if (body)        textParts.push(body);
+            if (footer)      textParts.push(`_${footer}_`);
+            if (buttonLines) textParts.push(`\n${buttonLines}`);
+
+            result = await session.sock.sendMessage(jid, {
+                text: textParts.join('\n\n')
+            });
+        }
+
+        res.json({
+            success: true,
+            messageId: result.key.id,
+            timestamp: result.messageTimestamp
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Learmy WhatsApp QR Engine listening on port ${PORT}`);
 });
