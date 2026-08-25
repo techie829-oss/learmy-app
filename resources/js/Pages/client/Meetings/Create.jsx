@@ -10,12 +10,19 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
         ? (meeting.targets ?? []).map(t => ({ type: t.target_type, id: t.target_id }))
         : [];
 
+    const getLocalDatetime = (offsetHours = 1) => {
+        const d = new Date();
+        d.setHours(d.getHours() + offsetHours, 0, 0, 0);
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
     const { data, setData, post, put, processing, errors } = useForm({
         workspace_id:     workspace_id,
         title:            isEdit ? meeting.title : '',
         description:      isEdit ? (meeting.description ?? '') : '',
-        start_time:       isEdit ? meeting.start_time?.slice(0, 16) : '',
-        end_time:         isEdit ? meeting.end_time?.slice(0, 16) : '',
+        start_time:       isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
+        end_time:         isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
         timezone:         isEdit ? meeting.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
         custom_meet_link: isEdit ? (meeting.meet_link ?? '') : '',
         targets:          initialTargets,
