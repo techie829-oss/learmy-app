@@ -1,10 +1,9 @@
 @php
     use App\Models\SystemSetting;
 
-    // Resolve branding with graceful fallback (mirrors HandleInertiaRequests::brandingShare()).
     try {
-        $appName  = SystemSetting::get('app_name') ?: config('saas.app_name', config('app.name'));
-        $primary  = SystemSetting::get('primary_color') ?: config('saas.branding.primary_color', '#467235');
+        $appName  = SystemSetting::get('app_name') ?: config('app.name', 'Learmy');
+        $primary  = SystemSetting::get('primary_color') ?: '#6366F1';
         $logoPath = SystemSetting::get('app_logo_path');
         $logoUrl  = $logoPath
             ? \Illuminate\Support\Facades\Storage::disk(SystemSetting::get('app_logo_disk', 'public'))->url($logoPath)
@@ -14,22 +13,21 @@
             ? \Illuminate\Support\Facades\Storage::disk(SystemSetting::get('app_favicon_disk', 'public'))->url($faviconPath)
             : null;
     } catch (\Throwable) {
-        $appName  = config('saas.app_name', config('app.name'));
-        $primary  = config('saas.branding.primary_color', '#467235');
+        $appName  = config('app.name', 'Learmy');
+        $primary  = '#6366F1';
         $logoUrl  = null;
         $faviconUrl = null;
     }
 
-    // Pick readable text on the primary color from its relative luminance.
     $hex = ltrim($primary, '#');
     if (strlen($hex) === 3) {
         $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
     }
     [$r, $g, $b] = strlen($hex) === 6
         ? [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))]
-        : [70, 114, 53];
+        : [99, 102, 241];
     $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255;
-    $onPrimary = $luminance > 0.6 ? '#20321d' : '#ffffff';
+    $onPrimary = $luminance > 0.6 ? '#0f172a' : '#ffffff';
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
@@ -43,111 +41,123 @@
     @else
         <link rel="icon" type="image/png" href="/logonew.png">
         <link rel="alternate icon" href="/favicon.ico" sizes="any">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     @endif
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=space-grotesk:400,500,600,700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
         :root {
             --primary: {{ $primary }};
             --on-primary: {{ $onPrimary }};
-            --ink: #20321d;       /* secondary-900 (dark green) */
-            --ink-soft: #566b50;  /* muted green */
-            --surface: #f7faec;   /* brand surface */
+            --ink: #0f172a;
+            --ink-soft: #64748b;
+            --surface: #f8fafc;
         }
         *, *::before, *::after { box-sizing: border-box; }
-        html, body { height: 100%; margin: 0; font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
+        html, body { height: 100%; margin: 0; font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; }
         body {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             color: var(--ink); padding: 2rem; position: relative; overflow: hidden;
-            background:
-                radial-gradient(60rem 40rem at 50% -10%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%),
-                linear-gradient(180deg, var(--surface), #ffffff 60%);
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.25) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.2) 0px, transparent 50%),
+                radial-gradient(at 50% 50%, rgba(59, 130, 246, 0.15) 0px, transparent 50%);
         }
-        /* Soft decorative glow blobs in the brand color */
-        body::before, body::after {
-            content: ''; position: fixed; border-radius: 50%; filter: blur(80px);
-            background: var(--primary); opacity: .18; z-index: 0;
+
+        /* Ambient floating glow ORBs */
+        .orb-1 {
+            position: fixed; width: 35rem; height: 35rem; border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            filter: blur(100px); opacity: 0.25; top: -10rem; left: -10rem; pointer-events: none;
         }
-        body::before { width: 30rem; height: 30rem; top: -10rem; left: -8rem; }
-        body::after  { width: 26rem; height: 26rem; bottom: -10rem; right: -8rem; opacity: .12; }
+        .orb-2 {
+            position: fixed; width: 30rem; height: 30rem; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            filter: blur(100px); opacity: 0.2; bottom: -10rem; right: -10rem; pointer-events: none;
+        }
 
         .brand {
-            position: fixed; top: 1.5rem; left: 1.75rem; z-index: 2;
-            display: inline-flex; align-items: center; gap: .6rem;
-            font-weight: 700; font-size: 1.15rem; color: var(--ink); text-decoration: none; letter-spacing: -.01em;
+            position: fixed; top: 2rem; left: 2.25rem; z-index: 10;
+            display: inline-flex; align-items: center; gap: 0.75rem;
+            font-weight: 800; font-size: 1.35rem; color: #ffffff; text-decoration: none; letter-spacing: -0.025em;
         }
-        .brand img { height: 2rem; max-width: 170px; object-fit: contain; display: block; }
-        .brand .dot {
-            width: 1.85rem; height: 1.85rem; border-radius: .55rem; display: inline-flex;
-            align-items: center; justify-content: center; background: var(--primary); color: var(--on-primary);
-            font-weight: 700; font-size: 1rem;
+        .brand img { height: 2.25rem; max-width: 180px; object-fit: contain; display: block; }
+        .brand-logo-fallback {
+            width: 2.25rem; height: 2.25rem; border-radius: 0.65rem; display: inline-flex;
+            align-items: center; justify-content: center; background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #ffffff; font-weight: 800; font-size: 1.15rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
         }
 
         .card {
-            position: relative; z-index: 1; background: rgba(255, 255, 255, .85);
-            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(8, 33, 50, .08); border-radius: 1.25rem;
-            padding: 3.25rem 2.75rem; max-width: 460px; width: 100%; text-align: center;
-            box-shadow: 0 24px 60px -24px rgba(8, 33, 50, .25), 0 2px 8px rgba(8, 33, 50, .04);
+            position: relative; z-index: 5; background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 1.5rem;
+            padding: 3.5rem 3rem; max-width: 480px; width: 100%; text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
         }
-        .code {
-            font-size: clamp(5rem, 18vw, 7.5rem); font-weight: 700; line-height: .9;
-            letter-spacing: -.04em; margin-bottom: 1rem; color: var(--ink);
-            background: linear-gradient(135deg, var(--ink) 35%, var(--primary));
-            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 .65rem; letter-spacing: -.01em; }
-        p { color: var(--ink-soft); margin: 0 auto 2.25rem; line-height: 1.65; max-width: 32ch; }
 
-        .actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+        .code-badge {
+            display: inline-block; font-size: clamp(4.5rem, 14vw, 6.5rem); font-weight: 800; line-height: 1;
+            letter-spacing: -0.04em; margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, #ffffff 30%, #818cf8 100%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        h1 { font-size: 1.5rem; font-weight: 700; color: #ffffff; margin: 0 0 0.75rem; letter-spacing: -0.02em; }
+        p { color: #94a3b8; font-size: 0.95rem; margin: 0 auto 2.25rem; line-height: 1.6; max-width: 34ch; }
+
+        .actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
         .btn {
-            display: inline-flex; align-items: center; gap: .5rem; padding: .7rem 1.6rem;
-            border-radius: .7rem; text-decoration: none; font-weight: 600; font-size: .95rem;
-            transition: transform .15s ease, box-shadow .15s ease, background .15s ease; cursor: pointer; border: 0;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.65rem;
+            border-radius: 0.75rem; text-decoration: none; font-weight: 600; font-size: 0.925rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; border: 0;
         }
         .btn-primary {
-            background: var(--primary); color: var(--on-primary);
-            box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--primary) 75%, transparent);
+            background: linear-gradient(135deg, #6366f1, #4f46e5); color: #ffffff;
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
         }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px color-mix(in srgb, var(--primary) 80%, transparent); }
-        .btn-ghost { background: transparent; color: var(--ink); border: 1px solid rgba(8, 33, 50, .14); }
-        .btn-ghost:hover { background: rgba(8, 33, 50, .04); transform: translateY(-1px); }
-
-        @media (prefers-color-scheme: dark) {
-            :root { --ink: #eef2f6; --ink-soft: #94a3b8; --surface: #0a1722; }
-            body { background:
-                radial-gradient(60rem 40rem at 50% -10%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 70%),
-                linear-gradient(180deg, #0a1722, #050c13 60%); }
-            .brand { color: var(--ink); }
-            .card { background: rgba(13, 27, 40, .7); border-color: rgba(255, 255, 255, .08); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .6); }
-            .code { background: linear-gradient(135deg, #eef2f6 35%, var(--primary)); -webkit-background-clip: text; background-clip: text; }
-            .btn-ghost { color: var(--ink); border-color: rgba(255, 255, 255, .16); }
-            .btn-ghost:hover { background: rgba(255, 255, 255, .06); }
+        .btn-primary:hover {
+            transform: translateY(-2px); box-shadow: 0 14px 26px -5px rgba(99, 102, 241, 0.5);
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
         }
-        @media (prefers-reduced-motion: reduce) {
-            .btn { transition: none; }
-            .btn:hover { transform: none; }
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.05); color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.1); color: #ffffff;
+            transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
 <body>
+    <div class="orb-1"></div>
+    <div class="orb-2"></div>
+
     <a href="{{ url('/') }}" class="brand" aria-label="{{ $appName }}">
         @if ($logoUrl)
             <img src="{{ $logoUrl }}" alt="{{ $appName }}">
         @else
-            <span class="dot">{{ strtoupper(substr($appName, 0, 1)) }}</span>
+            <span class="brand-logo-fallback">{{ strtoupper(substr($appName, 0, 1)) }}</span>
             <span>{{ $appName }}</span>
         @endif
     </a>
 
     <main class="card">
-        <div class="code">{{ $code }}</div>
+        <div class="code-badge">{{ $code }}</div>
         <h1>{{ $title }}</h1>
         <p>{{ $message }}</p>
         <div class="actions">
-            <a href="{{ url('/') }}" class="btn btn-primary">Go Home</a>
-            <a href="javascript:history.back()" class="btn btn-ghost">Go Back</a>
+            <a href="{{ url('/app/dashboard') }}" class="btn btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Go to Dashboard
+            </a>
+            <a href="javascript:history.back()" class="btn btn-ghost">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Go Back
+            </a>
         </div>
     </main>
 </body>

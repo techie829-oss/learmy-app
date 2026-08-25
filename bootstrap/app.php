@@ -172,4 +172,18 @@ return Application::configure(basePath: dirname(__DIR__))
                 ? response()->json(['message' => 'Unauthenticated.'], 401)
                 : redirect()->route('login');
         });
+
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception, \Illuminate\Http\Request $request) {
+            if (! app()->environment('local') && in_array($response->getStatusCode(), [500, 503, 404, 403, 419])) {
+                return \Inertia\Inertia::render('Error', ['status' => $response->getStatusCode()])
+                    ->toResponse($request)
+                    ->setStatusCode($response->getStatusCode());
+            } elseif ($response->getStatusCode() === 419) {
+                return back()->with([
+                    'message' => 'The page expired, please try again.',
+                ]);
+            }
+
+            return $response;
+        });
     })->create();
