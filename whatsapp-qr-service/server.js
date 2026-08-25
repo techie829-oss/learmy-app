@@ -123,13 +123,13 @@ async function getOrCreateSession(sessionId) {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
-
         for (const msg of messages) {
             if (!msg.message || msg.key.fromMe) continue;
 
-            let realPhone = null;
             let senderJid = msg.key.remoteJid || '';
+            if (senderJid === 'status@broadcast') continue;
+
+            let realPhone = null;
 
             // Handle WhatsApp LID (Linked Identity ID e.g. 32495856832586@lid)
             if (senderJid.endsWith('@lid')) {
@@ -144,7 +144,17 @@ async function getOrCreateSession(sessionId) {
 
             if (senderJid.endsWith('@s.whatsapp.net')) {
                 realPhone = senderJid.split('@')[0];
+            } else {
+                realPhone = senderJid.split('@')[0];
             }
+
+            const bodyText = msg.message?.conversation
+                || msg.message?.extendedTextMessage?.text
+                || msg.message?.imageMessage?.caption
+                || msg.message?.videoMessage?.caption
+                || '[Media]';
+
+            console.log(`[Inbound Message] Session: ${sessionId} | From: ${realPhone} | Text: "${bodyText}"`);
 
             notifyLaravel(sessionId, 'inbound_message', {
                 message: msg,
@@ -161,7 +171,7 @@ const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 async function notifyLaravel(sessionId, event, data) {
     try {
-        await axios.post(LARAVEL_WEBHOOK_URL, {
+        const resp = await axios.post(LARAVEL_WEBHOOK_URL, {
             session_id: sessionId,
             event,
             data,
@@ -172,10 +182,11 @@ async function notifyLaravel(sessionId, event, data) {
                 'X-Learmy-QR-Secret': WA_QR_SECRET
             },
             httpsAgent,
-            timeout: 5000
+            timeout: 8000
         });
+        console.log(`[Webhook Notified] Session: ${sessionId} | Event: ${event} | Status: ${resp.status}`);
     } catch (err) {
-        console.error(`[Webhook Error] Failed to notify Laravel for session ${sessionId}:`, err.message);
+        console.error(`[Webhook Error] Failed to notify Laravel for session ${sessionId} (${event}):`, err.message);
     }
 }
 
