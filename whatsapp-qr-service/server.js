@@ -201,7 +201,11 @@ async function getOrCreateSession(sessionId) {
                 let realPhone = null;
                 if (senderJid.endsWith('@lid')) {
                     const rawLid = senderJid.split('@')[0];
-                    if (lidMap.has(senderJid)) realPhone = lidMap.get(senderJid);
+                    if (msg.key.senderPn && msg.key.senderPn.endsWith('@s.whatsapp.net')) {
+                        realPhone = msg.key.senderPn.split('@')[0];
+                        lidMap.set(senderJid, realPhone);
+                        lidMap.set(rawLid, realPhone);
+                    } else if (lidMap.has(senderJid)) realPhone = lidMap.get(senderJid);
                     else if (lidMap.has(rawLid)) realPhone = lidMap.get(rawLid);
                     else realPhone = rawLid;
                 } else {
@@ -225,38 +229,33 @@ async function getOrCreateSession(sessionId) {
 
             let realPhone = null;
 
-            // Attempt: resolve LID using contacts store or lidMap
+            // Attempt: resolve LID using senderPn, lidMap or contact store
             if (senderJid.endsWith('@lid')) {
                 const rawLid = senderJid.split('@')[0];
 
-                // 1. Check our lidMap
-                if (lidMap.has(senderJid)) {
+                // 1. Check if Baileys provided senderPn (Sender Phone Number)
+                if (msg.key.senderPn && msg.key.senderPn.endsWith('@s.whatsapp.net')) {
+                    realPhone = msg.key.senderPn.split('@')[0];
+                    lidMap.set(senderJid, realPhone);
+                    lidMap.set(rawLid, realPhone);
+                    console.log(`[LID senderPn Match] ${senderJid} → +${realPhone}`);
+                    notifyLaravel(sessionId, 'lid_resolved', {
+                        lid: rawLid,
+                        phone: realPhone
+                    });
+                } else if (lidMap.has(senderJid)) {
                     realPhone = lidMap.get(senderJid);
                 } else if (lidMap.has(rawLid)) {
                     realPhone = lidMap.get(rawLid);
                 } else {
-                    // 2. Try sock.authState contacts (Baileys stores contacts in auth state)
-                    try {
-                        const authContacts = sessionData.sock?.authState?.creds?.myAppStateKeyId ? {} : {};
-                        // Check if sock has a getContact method
-                        if (typeof sessionData.sock?.store?.getContact === 'function') {
-                            const contact = await sessionData.sock.store.getContact(senderJid);
-                            if (contact?.id?.endsWith('@s.whatsapp.net')) {
-                                realPhone = contact.id.split('@')[0];
-                                console.log(`[LID getContact] ${senderJid} → +${realPhone}`);
-                            }
-                        }
-                    } catch {}
-
-                    // 3. Fallback to participant / other fields
-                    if (!realPhone) {
-                        const alt = msg.key.participant || msg.participant || msg.key.remoteJidAlt || '';
-                        if (alt.endsWith('@s.whatsapp.net')) {
-                            realPhone = alt.split('@')[0];
-                        }
+                    // 2. Try fallback fields participant / remoteJidAlt
+                    const alt = msg.key.participant || msg.participant || msg.key.remoteJidAlt || '';
+                    if (alt.endsWith('@s.whatsapp.net')) {
+                        realPhone = alt.split('@')[0];
+                        lidMap.set(senderJid, realPhone);
+                        lidMap.set(rawLid, realPhone);
                     }
 
-                    // 4. Last resort: use LID number as phone (may still be wrong)
                     if (!realPhone) {
                         realPhone = rawLid;
                         console.warn(`[LID UNRESOLVED] ${senderJid} — using raw LID as fallback. Full msg key:`, JSON.stringify(msg.key));
