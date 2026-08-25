@@ -180,10 +180,10 @@ export default function Topbar({
                                     {recentNotifs.length === 0 ? (
                                         <p className="text-sm text-neutral-400 text-center py-6">{t('ui.no_recent_notifications')}</p>
                                     ) : recentNotifs.map(n => (
-                                        <div key={n.id} className={`px-4 py-3 text-sm ${n.read_at ? 'opacity-60' : 'bg-brand-50/40 dark:bg-brand-900/10'}`}>
-                                            <p className="font-medium text-neutral-800 dark:text-neutral-200">{n.data?.type?.replace('_', ' ')}</p>
-                                            <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{n.data?.snippet ?? n.data?.name ?? n.data?.automation ?? ''}</p>
-                                        </div>
+                                         <div key={n.id} className={`px-4 py-3 text-sm ${n.read_at ? 'opacity-60' : 'bg-brand-50/40 dark:bg-brand-900/10'}`}>
+                                             <p className="font-semibold capitalize text-neutral-800 dark:text-neutral-200">{n.data?.title ?? n.data?.type?.replace('_', ' ') ?? 'Notification'}</p>
+                                             <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5 line-clamp-2">{n.data?.message ?? n.data?.snippet ?? n.data?.name ?? n.data?.automation ?? ''}</p>
+                                         </div>
                                     ))}
                                 </div>
                                 <div className="border-t border-neutral-100 dark:border-neutral-800 px-4 py-2 text-center">
