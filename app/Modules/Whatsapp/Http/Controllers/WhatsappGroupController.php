@@ -159,15 +159,23 @@ class WhatsappGroupController extends Controller
 
                 // Skip own number (the connected QR number)
                 // Upsert contact by phone_e164
-                $contact = Contact::firstOrCreate(
-                    ['workspace_id' => $workspaceId, 'phone_e164' => $phone],
-                    [
-                        'first_name'        => "WA Contact",
+                $contact = Contact::withTrashed()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('phone_e164', $phone)
+                    ->first();
+
+                if (! $contact) {
+                    $contact = Contact::create([
+                        'workspace_id'      => $workspaceId,
+                        'phone_e164'        => $phone,
+                        'first_name'        => 'WA Contact',
                         'last_name'         => ltrim($phone, '+'),
                         'opt_in_whatsapp'   => true,
                         'source'            => 'whatsapp_group',
-                    ]
-                );
+                    ]);
+                } elseif ($contact->trashed()) {
+                    $contact->restore();
+                }
 
                 // Assign tag if provided
                 if ($tag && ! $contact->tags()->where('contact_tags.id', $tag->id)->exists()) {

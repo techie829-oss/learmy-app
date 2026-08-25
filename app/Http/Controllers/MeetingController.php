@@ -355,15 +355,23 @@ class MeetingController extends Controller
                     $phone = '+' . $phone;
                 }
 
-                $contact = \App\Modules\Shared\Models\Contact::firstOrCreate(
-                    ['workspace_id' => $workspaceId, 'phone_e164' => $phone],
-                    [
-                        'first_name'      => 'WA Contact',
-                        'last_name'       => ltrim($phone, '+'),
-                        'opt_in_whatsapp' => true,
-                        'source'          => 'whatsapp_group',
-                    ]
-                );
+                $contact = \App\Modules\Shared\Models\Contact::withTrashed()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('phone_e164', $phone)
+                    ->first();
+
+                if (! $contact) {
+                    $contact = \App\Modules\Shared\Models\Contact::create([
+                        'workspace_id'      => $workspaceId,
+                        'phone_e164'        => $phone,
+                        'first_name'        => 'WA Contact',
+                        'last_name'         => ltrim($phone, '+'),
+                        'opt_in_whatsapp'   => true,
+                        'source'            => 'whatsapp_group',
+                    ]);
+                } elseif ($contact->trashed()) {
+                    $contact->restore();
+                }
 
                 if (! $contact->tags()->where('contact_tags.id', $tag->id)->exists()) {
                     $contact->tags()->attach($tag->id);
