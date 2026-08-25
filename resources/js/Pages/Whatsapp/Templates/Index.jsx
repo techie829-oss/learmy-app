@@ -2,7 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import EmptyState from '@/Components/EmptyState';
 import TemplatePreview from '@/Components/TemplatePreview';
-import { Plus, RefreshCw, CheckCircle, XCircle, Clock, PauseCircle, FileText, Search, Phone, Pencil, Trash2 } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle, XCircle, Clock, PauseCircle, FileText, Search, Phone, Pencil, Trash2, Info, BookOpen } from 'lucide-react';
 import { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,8 @@ export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = 
     const { props } = usePage();
     const flash = props?.flash ?? {};
     const pageErrors = props?.errors ?? {};
+
+    const [showGuide, setShowGuide] = useState(true);
 
     const safeFilters = filters || {};
     const safeTemplates = Array.isArray(templates) ? templates : [];
@@ -67,6 +69,12 @@ export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = 
                     </div>
                     <div className="flex gap-2">
                         <button
+                            onClick={() => setShowGuide(!showGuide)}
+                            className="flex items-center gap-1.5 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition"
+                        >
+                            <BookOpen className="h-4 w-4" /> {showGuide ? 'Hide Guide' : '📖 Variables Guide'}
+                        </button>
+                        <button
                             onClick={handleSync}
                             className="flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
                         >
@@ -80,6 +88,46 @@ export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = 
                         </Link>
                     </div>
                 </div>
+
+                {/* Notes / Guide Card for Template Variables */}
+                {showGuide && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-900/10 transition-all">
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 flex-shrink-0 mt-0.5">
+                                <Info className="h-5 w-5" />
+                            </div>
+                            <div className="space-y-2 text-xs text-blue-900 dark:text-blue-200">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-bold text-blue-950 dark:text-blue-100">
+                                        💡 WhatsApp Template Variables &amp; How They Work
+                                    </p>
+                                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Auto-replaced on send</span>
+                                </div>
+                                <p className="text-blue-800 dark:text-blue-300">
+                                    Template likhte waqt aap text mein neeche diye gaye variables inject kar sakte hain. Student ko message jaate waqt ye values dynamic replace ho jayengi:
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1 font-mono">
+                                    <div className="rounded bg-white dark:bg-neutral-800 p-2.5 border border-blue-200 dark:border-neutral-700 shadow-xs">
+                                        <p className="font-bold text-blue-700 dark:text-blue-400 text-xs"><code>{`{{1}}`}</code> or <code>{`{{first_name}}`}</code></p>
+                                        <p className="font-sans text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">Student First Name (e.g. Rahul)</p>
+                                    </div>
+                                    <div className="rounded bg-white dark:bg-neutral-800 p-2.5 border border-blue-200 dark:border-neutral-700 shadow-xs">
+                                        <p className="font-bold text-blue-700 dark:text-blue-400 text-xs"><code>{`{{2}}`}</code> or <code>{`{{class_title}}`}</code></p>
+                                        <p className="font-sans text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">Class Name (e.g. Physics Ch-4)</p>
+                                    </div>
+                                    <div className="rounded bg-white dark:bg-neutral-800 p-2.5 border border-blue-200 dark:border-neutral-700 shadow-xs">
+                                        <p className="font-bold text-blue-700 dark:text-blue-400 text-xs"><code>{`{{3}}`}</code> or <code>{`{{start_time}}`}</code></p>
+                                        <p className="font-sans text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">Class Date &amp; Time (e.g. 26 Aug, 10:00 AM)</p>
+                                    </div>
+                                    <div className="rounded bg-white dark:bg-neutral-800 p-2.5 border border-blue-200 dark:border-neutral-700 shadow-xs">
+                                        <p className="font-bold text-blue-700 dark:text-blue-400 text-xs"><code>{`{{4}}`}</code> or <code>{`{{meet_link}}`}</code></p>
+                                        <p className="font-sans text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">Google Meet URL (e.g. meet.google.com/...)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {flash.success && <div className="rounded-lg bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-3 text-sm font-medium border border-green-200">{flash.success}</div>}
                 {flash.error   && <div className="rounded-lg bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 px-4 py-3 text-sm font-medium border border-red-200">{flash.error}</div>}
