@@ -66,18 +66,18 @@ class MeetingController extends Controller
             'custom_meet_link'           => 'nullable|url',
             'whatsapp_template'          => 'nullable|string|max:128',
             'send_whatsapp_notification' => 'nullable|boolean',
+            'reminder_settings'          => 'nullable|array',
             'targets'                    => 'nullable|array',
             'targets.*.type'             => 'required_with:targets|string',
             'targets.*.id'               => 'required_with:targets|integer',
         ]);
 
-        // Always use the authenticated user's workspace — never trust client-supplied workspace_id.
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
         $googleWarning = null;
 
         return DB::transaction(function () use ($validated, $workspaceId, &$googleWarning) {
-            $meetLink     = !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : null;
+            $meetLink      = !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : null;
             $googleEventId = null;
 
             // Generate Google Meet Link if Google Integration is connected and no manual link was provided
@@ -89,8 +89,8 @@ class MeetingController extends Controller
                         $validated['title'],
                         Carbon::parse($validated['start_time'])->toAtomString(),
                         Carbon::parse($validated['end_time'])->toAtomString(),
-                        [],    // attendeeEmails (we notify via WhatsApp instead)
-                        true,  // withMeet
+                        [],
+                        true,
                         $validated['description'] ?? null,
                         $validated['timezone'] ?? 'UTC'
                     );
@@ -124,6 +124,7 @@ class MeetingController extends Controller
                 'status'                     => 'scheduled',
                 'whatsapp_template'          => $validated['whatsapp_template'] ?? null,
                 'send_whatsapp_notification' => $validated['send_whatsapp_notification'] ?? true,
+                'reminder_settings'          => $validated['reminder_settings'] ?? null,
             ]);
 
             // Save Smart Mapping Targets
@@ -135,13 +136,13 @@ class MeetingController extends Controller
                 ]);
             }
 
-            // Trigger Notification Service
-            $notifReport = $this->notificationService->dispatchNotifications($meeting);
+            // Trigger Instant Notification for 'on_create' trigger
+            $notifReport = $this->notificationService->dispatchNotifications($meeting, 'on_create');
 
             if ($googleWarning) {
                 $successMsg = $googleWarning;
             } elseif (! $notifReport['whatsapp_connected']) {
-                $successMsg = 'Class scheduled! Meet Link: ' . ($meetLink ?? 'None') . '. Note: Connect WhatsApp in Channel Setup to send automated WhatsApp reminders to students.';
+                $successMsg = 'Class scheduled! Meet Link: ' . ($meetLink ?? 'None') . '. Note: Connect WhatsApp in Channel Setup to send automated WhatsApp reminders.';
             } elseif ($notifReport['contacts_count'] > 0) {
                 $successMsg = 'Class scheduled & WhatsApp notifications sent to ' . $notifReport['sent_count'] . ' of ' . $notifReport['contacts_count'] . ' students!';
             } else {
@@ -157,14 +158,22 @@ class MeetingController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_if($meeting->workspace_id !== $workspaceId, 403);
 
-        $tags     = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
-        $segments = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $tags        = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $segments    = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
+        $waTemplates = $this->getWhatsappTemplates($workspaceId);
+
+        $whatsappConnected = ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('channel', 'whatsapp')
+            ->where('status', 'active')
+            ->exists();
 
         return Inertia::render('client/Meetings/Create', [
-            'meeting'      => $meeting->load('targets'),
-            'tags'         => $tags,
-            'segments'     => $segments,
-            'workspace_id' => $workspaceId,
+            'meeting'           => $meeting->load('targets'),
+            'tags'              => $tags,
+            'segments'          => $segments,
+            'workspace_id'      => $workspaceId,
+            'waTemplates'       => $waTemplates,
+            'whatsappConnected' => $whatsappConnected,
         ]);
     }
 
@@ -179,25 +188,31 @@ class MeetingController extends Controller
         abort_if($meeting->workspace_id !== $workspaceId, 403);
 
         $validated = $request->validate([
-            'title'            => 'required|string|max:255',
-            'description'      => 'nullable|string',
-            'start_time'       => 'required|date',
-            'end_time'         => 'required|date|after:start_time',
-            'timezone'         => 'nullable|string|timezone',
-            'custom_meet_link' => 'nullable|url',
-            'targets'          => 'nullable|array',
-            'targets.*.type'   => 'required_with:targets|string',
-            'targets.*.id'     => 'required_with:targets|integer',
+            'title'                      => 'required|string|max:255',
+            'description'                => 'nullable|string',
+            'start_time'                 => 'required|date',
+            'end_time'                   => 'required|date|after:start_time',
+            'timezone'                   => 'nullable|string|timezone',
+            'custom_meet_link'           => 'nullable|url',
+            'whatsapp_template'          => 'nullable|string|max:128',
+            'send_whatsapp_notification' => 'nullable|boolean',
+            'reminder_settings'          => 'nullable|array',
+            'targets'                    => 'nullable|array',
+            'targets.*.type'             => 'required_with:targets|string',
+            'targets.*.id'               => 'required_with:targets|integer',
         ]);
 
         return DB::transaction(function () use ($meeting, $validated) {
             $meeting->update([
-                'title'       => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'start_time'  => $validated['start_time'],
-                'end_time'    => $validated['end_time'],
-                'timezone'    => $validated['timezone'] ?? 'UTC',
-                'meet_link'   => !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : $meeting->meet_link,
+                'title'                      => $validated['title'],
+                'description'                => $validated['description'] ?? null,
+                'start_time'                 => $validated['start_time'],
+                'end_time'                   => $validated['end_time'],
+                'timezone'                   => $validated['timezone'] ?? 'UTC',
+                'meet_link'                  => !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : $meeting->meet_link,
+                'whatsapp_template'          => $validated['whatsapp_template'] ?? null,
+                'send_whatsapp_notification' => $validated['send_whatsapp_notification'] ?? true,
+                'reminder_settings'          => $validated['reminder_settings'] ?? null,
             ]);
 
             // Replace targets
@@ -230,7 +245,6 @@ class MeetingController extends Controller
      */
     private function getWhatsappTemplates(int $workspaceId): array
     {
-        // Try to load from WhatsappTemplate model (Meta approved templates)
         try {
             $templates = WhatsappTemplate::where('workspace_id', $workspaceId)
                 ->where('status', 'APPROVED')
@@ -241,7 +255,6 @@ class MeetingController extends Controller
                 ])
                 ->toArray();
 
-            // Always prepend the default class reminder template
             array_unshift($templates, [
                 'value' => 'class_scheduled_notification',
                 'label' => 'Default Class Reminder (built-in)',

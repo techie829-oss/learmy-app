@@ -11,40 +11,76 @@ use Illuminate\Support\Facades\Log;
 class SendMeetingReminders extends Command
 {
     protected $signature = 'meetings:send-reminders';
-    protected $description = 'Check upcoming meetings and dispatch automated WhatsApp reminders (1 hour and 15 mins before start time)';
+    protected $description = 'Check upcoming meetings and dispatch automated WhatsApp reminders for morning, 15-min before, and class start triggers';
 
     public function handle(MeetingNotificationService $notificationService): int
     {
         $now = Carbon::now();
 
-        // 1. Reminders for meetings starting in 55-65 minutes (1 Hour Reminder)
-        $oneHourWindowStart = $now->copy()->addMinutes(55);
-        $oneHourWindowEnd = $now->copy()->addMinutes(65);
+        // ─────────────────────────────────────────────────────────────────────
+        // 1. Morning Reminders (Sent on the day of the class, at or after 08:00 AM)
+        // ─────────────────────────────────────────────────────────────────────
+        if ($now->hour >= 8) {
+            $todayStart = $now->copy()->startOfDay();
+            $todayEnd   = $now->copy()->endOfDay();
 
-        $oneHourMeetings = Meeting::where('status', 'scheduled')
-            ->whereNull('reminded_1h_at')
-            ->whereBetween('start_time', [$oneHourWindowStart, $oneHourWindowEnd])
-            ->get();
+            $morningMeetings = Meeting::where('status', 'scheduled')
+                ->whereNull('reminded_morning_at')
+                ->whereBetween('start_time', [$todayStart, $todayEnd])
+                ->get();
 
-        foreach ($oneHourMeetings as $meeting) {
-            $count = $notificationService->dispatchNotifications($meeting, 'class_reminder_1h');
-            $meeting->update(['reminded_1h_at' => now()]);
-            $this->info("Dispatched 1-hour reminders for Meeting ID {$meeting->id}: {$count} sent.");
+            foreach ($morningMeetings as $meeting) {
+                if ($meeting->isReminderEnabled('morning')) {
+                    $report = $notificationService->dispatchNotifications($meeting, 'morning');
+                    $meeting->update(['reminded_morning_at' => now()]);
+                    $this->info("Dispatched MORNING reminder for Meeting #{$meeting->id} ('{$meeting->title}'): {$report['sent_count']} sent.");
+                } else {
+                    // Mark as processed if trigger disabled so we don't query it repeatedly
+                    $meeting->update(['reminded_morning_at' => now()]);
+                }
+            }
         }
 
-        // 2. Reminders for meetings starting in 10-20 minutes (15 Min Reminder)
-        $fifteenMinWindowStart = $now->copy()->addMinutes(10);
-        $fifteenMinWindowEnd = $now->copy()->addMinutes(20);
+        // ─────────────────────────────────────────────────────────────────────
+        // 2. 15 Minutes Before Class Reminders (Classes starting in 5 to 20 minutes)
+        // ─────────────────────────────────────────────────────────────────────
+        $fifteenMinStart = $now->copy()->addMinutes(5);
+        $fifteenMinEnd   = $now->copy()->addMinutes(20);
 
         $fifteenMinMeetings = Meeting::where('status', 'scheduled')
             ->whereNull('reminded_15m_at')
-            ->whereBetween('start_time', [$fifteenMinWindowStart, $fifteenMinWindowEnd])
+            ->whereBetween('start_time', [$fifteenMinStart, $fifteenMinEnd])
             ->get();
 
         foreach ($fifteenMinMeetings as $meeting) {
-            $count = $notificationService->dispatchNotifications($meeting, 'class_reminder_15m');
-            $meeting->update(['reminded_15m_at' => now()]);
-            $this->info("Dispatched 15-min reminders for Meeting ID {$meeting->id}: {$count} sent.");
+            if ($meeting->isReminderEnabled('before_15m')) {
+                $report = $notificationService->dispatchNotifications($meeting, 'before_15m');
+                $meeting->update(['reminded_15m_at' => now()]);
+                $this->info("Dispatched 15-MIN reminder for Meeting #{$meeting->id} ('{$meeting->title}'): {$report['sent_count']} sent.");
+            } else {
+                $meeting->update(['reminded_15m_at' => now()]);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // 3. Class Starts / LIVE NOW Reminders (Classes starting now: -10m to +3m window)
+        // ─────────────────────────────────────────────────────────────────────
+        $liveStart = $now->copy()->subMinutes(10);
+        $liveEnd   = $now->copy()->addMinutes(3);
+
+        $liveMeetings = Meeting::where('status', 'scheduled')
+            ->whereNull('reminded_start_at')
+            ->whereBetween('start_time', [$liveStart, $liveEnd])
+            ->get();
+
+        foreach ($liveMeetings as $meeting) {
+            if ($meeting->isReminderEnabled('on_start')) {
+                $report = $notificationService->dispatchNotifications($meeting, 'on_start');
+                $meeting->update(['reminded_start_at' => now()]);
+                $this->info("Dispatched LIVE START reminder for Meeting #{$meeting->id} ('{$meeting->title}'): {$report['sent_count']} sent.");
+            } else {
+                $meeting->update(['reminded_start_at' => now()]);
+            }
         }
 
         return Command::SUCCESS;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
-import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink, Clock, Sun, Zap, PlayCircle } from 'lucide-react';
 
 export default function Create({ tags = [], segments = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
     const isEdit = !!meeting;
@@ -9,6 +9,17 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
     const initialTargets = isEdit
         ? (meeting.targets ?? []).map(t => ({ type: t.target_type, id: t.target_id }))
         : [];
+
+    const defaultReminders = {
+        on_create:  { enabled: true,  template: '' },
+        morning:    { enabled: true,  template: '' },
+        before_15m: { enabled: true,  template: '' },
+        on_start:   { enabled: true,  template: '' },
+    };
+
+    const initialReminders = isEdit && meeting.reminder_settings
+        ? { ...defaultReminders, ...meeting.reminder_settings }
+        : defaultReminders;
 
     const getLocalDatetime = (offsetHours = 1) => {
         const d = new Date();
@@ -28,6 +39,7 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
         targets:                     initialTargets,
         whatsapp_template:           isEdit ? (meeting.whatsapp_template ?? '') : '',
         send_whatsapp_notification:  isEdit ? (meeting.send_whatsapp_notification ?? true) : true,
+        reminder_settings:           initialReminders,
     });
 
     const [selectedTargets, setSelectedTargets] = useState(initialTargets);
@@ -65,6 +77,17 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
         return 'Unknown Target';
     };
 
+    const updateReminderSetting = (trigger, key, value) => {
+        const updated = {
+            ...data.reminder_settings,
+            [trigger]: {
+                ...data.reminder_settings[trigger],
+                [key]: value,
+            },
+        };
+        setData('reminder_settings', updated);
+    };
+
     const submit = (e) => {
         e.preventDefault();
         if (isEdit) {
@@ -78,6 +101,36 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
         }
     };
 
+    const triggerConfigs = [
+        {
+            key: 'on_create',
+            title: '🚀 On Schedule (Instant Notification)',
+            subtitle: 'Class create hotey hi immediately student ko confirmation message jaayega.',
+            icon: Zap,
+            iconColor: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20',
+        },
+        {
+            key: 'morning',
+            title: '🌅 Morning of Class (08:00 AM)',
+            subtitle: 'Class wale din subah 8:00 baje automated reminder jaayega.',
+            icon: Sun,
+            iconColor: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20',
+        },
+        {
+            key: 'before_15m',
+            title: '⏰ 15 Minutes Before Class',
+            subtitle: 'Class shuru hone se 15 min pehle countdown alert jaayega.',
+            icon: Clock,
+            iconColor: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
+        },
+        {
+            key: 'on_start',
+            title: '🔴 When Class Starts (LIVE Now)',
+            subtitle: 'Class start hotey hi student ko direct Join link ke saath LIVE notification jaayega.',
+            icon: PlayCircle,
+            iconColor: 'text-red-500 bg-red-50 dark:bg-red-900/20',
+        },
+    ];
 
     return (
         <ClientLayout>
@@ -223,23 +276,25 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
                                 </div>
                             ) : (
                                 <p className="mt-1 text-xs text-neutral-400">
-                                    Optional: Select batches or segments to automatically send WhatsApp class reminders.
+                                    Select batches or segments to automatically send WhatsApp class reminders.
                                 </p>
                             )}
                             {errors.targets && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.targets}</p>}
                         </div>
 
-                        {/* WhatsApp Notification Section */}
-                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800/40 dark:bg-green-900/10">
+                        {/* WhatsApp Notification & Trigger Settings Section */}
+                        <div className="rounded-xl border border-green-200 bg-green-50/50 p-5 dark:border-green-800/40 dark:bg-green-900/10">
                             <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                <div className="flex items-center gap-2.5">
+                                    <div className="rounded-lg bg-green-100 p-2 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                        <MessageSquare className="h-5 w-5 flex-shrink-0" />
+                                    </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-green-800 dark:text-green-300">
-                                            📱 WhatsApp Reminder Notification
+                                        <p className="text-sm font-bold text-green-900 dark:text-green-200">
+                                            📱 Dynamic WhatsApp Reminders & Templates
                                         </p>
-                                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
-                                            Jab class schedule hogi, selected batches ko WhatsApp reminder jaayega.
+                                        <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
+                                            Har timing trigger ke liye alag template aur automated message choose karein.
                                         </p>
                                     </div>
                                 </div>
@@ -255,7 +310,7 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
                             </div>
 
                             {data.send_whatsapp_notification && (
-                                <div className="mt-4 space-y-3">
+                                <div className="mt-5 space-y-4">
                                     {!whatsappConnected && (
                                         <div className="rounded-md bg-amber-50 border border-amber-200 p-3 dark:bg-amber-900/20 dark:border-amber-700">
                                             <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -270,36 +325,80 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
                                         </div>
                                     )}
 
-                                    {/* Template Selector */}
-                                    {waTemplates.length > 0 && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-green-800 dark:text-green-300 mb-1">
-                                                WhatsApp Template
-                                            </label>
-                                            <select
-                                                value={data.whatsapp_template}
-                                                onChange={e => setData('whatsapp_template', e.target.value)}
-                                                className="block w-full rounded-md border-green-300 bg-white text-sm shadow-sm focus:border-green-500 focus:ring-green-500 dark:border-green-700 dark:bg-neutral-700 dark:text-white"
-                                            >
-                                                <option value="">Default Class Reminder (built-in QR message)</option>
-                                                {waTemplates.map(t => (
-                                                    <option key={t.value} value={t.value}>{t.label}</option>
-                                                ))}
-                                            </select>
-                                            <p className="mt-1 text-xs text-green-600 dark:text-green-500">
-                                                Empty = default rich reminder with class title, time, and meet link.
-                                            </p>
-                                        </div>
-                                    )}
+                                    {/* Triggers Configuration List */}
+                                    <div className="space-y-3">
+                                        <p className="text-xs font-bold tracking-wider uppercase text-green-800 dark:text-green-300">
+                                            Reminder Timing &amp; Template Options:
+                                        </p>
+
+                                        {triggerConfigs.map(config => {
+                                            const IconComponent = config.icon;
+                                            const isTriggerEnabled = data.reminder_settings?.[config.key]?.enabled ?? true;
+                                            const selectedTemplate = data.reminder_settings?.[config.key]?.template ?? '';
+
+                                            return (
+                                                <div
+                                                    key={config.key}
+                                                    className="rounded-lg border border-green-200/80 bg-white p-3.5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 transition-all"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-start gap-3 min-w-0">
+                                                            <div className={`p-2 rounded-lg ${config.iconColor} flex-shrink-0 mt-0.5`}>
+                                                                <IconComponent className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                                                                    {config.title}
+                                                                </p>
+                                                                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                                                                    {config.subtitle}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Trigger toggle */}
+                                                        <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={isTriggerEnabled}
+                                                                onChange={e => updateReminderSetting(config.key, 'enabled', e.target.checked)}
+                                                            />
+                                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                                                        </label>
+                                                    </div>
+
+                                                    {/* Template selector for this trigger */}
+                                                    {isTriggerEnabled && (
+                                                        <div className="mt-3 pl-11">
+                                                            <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-300 mb-1">
+                                                                Choose Template for this timing:
+                                                            </label>
+                                                            <select
+                                                                value={selectedTemplate}
+                                                                onChange={e => updateReminderSetting(config.key, 'template', e.target.value)}
+                                                                className="block w-full rounded-md border-neutral-300 bg-neutral-50 text-xs shadow-sm focus:border-green-500 focus:ring-green-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"
+                                                            >
+                                                                <option value="">✨ Default Built-in Template (Recommended)</option>
+                                                                {waTemplates.map(t => (
+                                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
 
                                     {/* Import Groups Link */}
-                                    <div className="pt-1">
+                                    <div className="pt-2 border-t border-green-200/50 dark:border-green-800/30 flex items-center justify-between">
                                         <Link
                                             href={route('whatsapp.groups.index')}
-                                            className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 hover:underline"
+                                            className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 hover:underline"
                                         >
-                                            <ExternalLink className="h-3 w-3" />
-                                            WhatsApp Groups se contacts import karo → Tag assign karo
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            WhatsApp Groups se contacts import karo → Batch tag assign karo
                                         </Link>
                                     </div>
                                 </div>
