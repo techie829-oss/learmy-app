@@ -102,7 +102,7 @@ class Conversation extends Model
      */
     public function isWhatsappWindowOpen(): bool
     {
-        if ($this->channelAccount?->channel !== 'whatsapp') {
+        if ($this->channelAccount?->channel !== 'whatsapp' || $this->channelAccount?->provider === 'qr_baileys') {
             return true;
         }
 
