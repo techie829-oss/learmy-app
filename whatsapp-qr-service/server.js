@@ -12,6 +12,7 @@ import makeWASocket, {
     DisconnectReason,
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
+    makeInMemoryStore,
     Browsers
 } from '@whiskeysockets/baileys';
 
@@ -70,7 +71,11 @@ async function getOrCreateSession(sessionId) {
         generateHighQualityLinkPreview: true
     });
 
+    const store = makeInMemoryStore({ logger });
+    store.bind(sock.ev);
+
     sessionData.sock = sock;
+    sessionData.store = store;
     activeSessions.set(sessionId, sessionData);
 
     sock.ev.on('creds.update', saveCreds);
@@ -177,14 +182,15 @@ async function getOrCreateSession(sessionId) {
                 } else if (lidMap.has(rawLid)) {
                     realPhone = lidMap.get(rawLid);
                 } else {
-                    // 2. Try Baileys contact store
+                    // 2. Try Baileys in-memory contact store
                     try {
-                        const storeContacts = sock.store?.contacts || {};
-                        const matched = Object.entries(storeContacts).find(([jid]) =>
-                            jid.endsWith('@s.whatsapp.net') && storeContacts[jid]?.lid === senderJid
+                        const storeContacts = store?.contacts || {};
+                        const matched = Object.entries(storeContacts).find(([jid, contact]) =>
+                            jid.endsWith('@s.whatsapp.net') && (contact?.lid === senderJid || contact?.lid === rawLid + '@lid')
                         );
                         if (matched) {
                             realPhone = matched[0].split('@')[0];
+                            console.log(`[LID Store Match] ${senderJid} → +${realPhone}`);
                         }
                     } catch {}
 
