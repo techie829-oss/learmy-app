@@ -7,6 +7,7 @@ use App\Modules\Shared\Models\ChannelAccount;
 use App\Modules\Shared\Models\Contact;
 use App\Modules\Shared\Models\ContactTag;
 use App\Modules\Shared\Models\Segment;
+use App\Modules\Whatsapp\Models\WhatsappTemplate;
 use App\Modules\Whatsapp\Services\CloudApiClient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -63,7 +64,7 @@ class MeetingNotificationService
 
             try {
                 if ($client) {
-                    // Meta Cloud API — send template
+                    // Meta Cloud API — send template with parameters
                     $components = [[
                         'type'       => 'body',
                         'parameters' => [
@@ -132,7 +133,8 @@ class MeetingNotificationService
     }
 
     /**
-     * Send a dynamic WhatsApp reminder via the QR / Baileys node service tailored to the trigger.
+     * Send a dynamic WhatsApp reminder via the QR / Baileys node service.
+     * Looks up custom template from DB if configured, otherwise generates trigger-tailored rich template.
      */
     private function sendViaQr(ChannelAccount $qrAccount, Contact $contact, Meeting $meeting, string $trigger, string $templateName): int
     {
@@ -144,8 +146,16 @@ class MeetingNotificationService
             $dateTime  = $meeting->start_time->format('d M Y, h:i A');
             $meetLink  = $meeting->meet_link ?? null;
 
-            // Generate Trigger-Specific Message Content
-            $templateData = $this->buildQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink, $templateName);
+            // Check if user selected a custom template from DB
+            $dbTemplate = WhatsappTemplate::where('workspace_id', $qrAccount->workspace_id)
+                ->where('name', $templateName)
+                ->first();
+
+            if ($dbTemplate && !empty($dbTemplate->components)) {
+                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $firstName, $title, $dateTime, $meetLink, $meeting->description);
+            } else {
+                $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink);
+            }
 
             $payload = [
                 'sessionId' => $sessionId,
@@ -159,6 +169,7 @@ class MeetingNotificationService
                 Log::info('[MeetingNotification] QR message sent.', [
                     'phone'     => $contact->phone_e164,
                     'trigger'   => $trigger,
+                    'template'  => $templateName,
                     'messageId' => $response->json('messageId'),
                 ]);
                 return 1;
@@ -178,9 +189,95 @@ class MeetingNotificationService
     }
 
     /**
-     * Build rich template structure (Header, Body, Footer, Buttons) tailored to trigger.
+     * Render a custom WhatsappTemplate from DB by replacing dynamic variables:
+     * {{1}} / {{first_name}} / {{name}} -> Student Name
+     * {{2}} / {{title}} / {{class_title}} -> Class Title
+     * {{3}} / {{start_time}} / {{date_time}} -> Class Time
+     * {{4}} / {{meet_link}} / {{link}} -> Google Meet URL
+     * {{5}} / {{description}} -> Class Description
      */
-    private function buildQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink, string $templateName): array
+    private function renderCustomDbTemplate(array $components, string $firstName, string $title, string $dateTime, ?string $meetLink, ?string $description): array
+    {
+        $replaceVars = function (string $text) use ($firstName, $title, $dateTime, $meetLink, $description): string {
+            $replacements = [
+                '{{1}} font'        => $firstName,
+                '{{1}}'             => $firstName,
+                '{{first_name}}'    => $firstName,
+                '{{name}}'          => $firstName,
+                '{{student_name}}'  => $firstName,
+                '{{2}}'             => $title,
+                '{{title}}'         => $title,
+                '{{class_title}}'   => $title,
+                '{{3}}'             => $dateTime,
+                '{{start_time}}'    => $dateTime,
+                '{{date_time}}'     => $dateTime,
+                '{{time}}'          => $dateTime,
+                '{{4}}'             => $meetLink ?? 'TBD',
+                '{{meet_link}}'     => $meetLink ?? 'TBD',
+                '{{link}}'          => $meetLink ?? 'TBD',
+                '{{5}}'             => $description ?? '',
+                '{{description}}'   => $description ?? '',
+            ];
+            return strtr($text, $replacements);
+        };
+
+        $header  = null;
+        $body    = '';
+        $footer  = 'Learmy Education Platform | learmy.solidrix.com';
+        $buttons = [];
+
+        foreach ($components as $comp) {
+            $type = $comp['type'] ?? '';
+
+            if ($type === 'HEADER') {
+                $format = $comp['format'] ?? 'TEXT';
+                if ($format === 'TEXT') {
+                    $header = ['type' => 'text', 'text' => $replaceVars($comp['text'] ?? '')];
+                } elseif (in_array($format, ['IMAGE', 'VIDEO']) && !empty($comp['url'])) {
+                    $header = ['type' => strtolower($format), 'url' => $comp['url']];
+                }
+            } elseif ($type === 'BODY') {
+                $body = $replaceVars($comp['text'] ?? '');
+            } elseif ($type === 'FOOTER') {
+                $footer = $comp['text'] ?? $footer;
+            } elseif ($type === 'BUTTONS') {
+                foreach ($comp['buttons'] ?? [] as $btn) {
+                    $btnType = $btn['type'] ?? '';
+                    if ($btnType === 'URL') {
+                        $url = $replaceVars($btn['url'] ?? $meetLink ?? 'https://learmy.solidrix.com');
+                        $buttons[] = ['type' => 'url', 'text' => $btn['text'] ?? 'Open Link', 'value' => $url];
+                    } elseif ($btnType === 'PHONE_NUMBER') {
+                        $phone = $btn['phone_number'] ?? '';
+                        $buttons[] = ['type' => 'call', 'text' => $btn['text'] ?? 'Call', 'value' => $phone];
+                    } else {
+                        $buttons[] = ['type' => 'quickReply', 'text' => $btn['text'] ?? 'Reply'];
+                    }
+                }
+            }
+        }
+
+        // Default header if none defined in DB template
+        if (!$header) {
+            $header = ['type' => 'text', 'text' => "📅 Class Reminder — Learmy"];
+        }
+
+        // Add Meet Link button if not present in custom template buttons
+        if ($meetLink && empty(array_filter($buttons, fn($b) => $b['type'] === 'url'))) {
+            array_unshift($buttons, ['type' => 'url', 'text' => '🔗 Join Class Now', 'value' => $meetLink]);
+        }
+
+        return [
+            'header'  => $header,
+            'body'    => $body,
+            'footer'  => $footer,
+            'buttons' => $buttons,
+        ];
+    }
+
+    /**
+     * Built-in dynamic fallback templates for each trigger timing.
+     */
+    private function buildDefaultQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink): array
     {
         $footer = 'Learmy Education Platform | learmy.solidrix.com';
 
