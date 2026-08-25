@@ -101,6 +101,16 @@ class MeetingNotificationService
             }
         }
 
+        // Direct broadcast message into targeted WhatsApp Group chat(s)
+        if ($qrAccount) {
+            foreach ($meeting->targets as $target) {
+                $targetId = (string) $target->target_id;
+                if ($target->target_type === 'wa_group' || str_ends_with($targetId, '@g.us')) {
+                    $this->sendToGroupViaQr($qrAccount, $targetId, $meeting, $trigger, $templateName);
+                }
+            }
+        }
+
         return [
             'whatsapp_connected' => true,
             'contacts_count'     => $contacts->count(),
@@ -184,6 +194,50 @@ class MeetingNotificationService
 
         } catch (\Throwable $e) {
             Log::error('[MeetingNotification] QR exception.', ['trigger' => $trigger, 'error' => $e->getMessage()]);
+            return 0;
+        }
+    }
+
+    /**
+     * Post class announcement directly into a WhatsApp Group chat.
+     */
+    private function sendToGroupViaQr(ChannelAccount $qrAccount, string $groupJid, Meeting $meeting, string $trigger, string $templateName): int
+    {
+        try {
+            $sessionId = $qrAccount->meta_json['session_id'] ?? 'workspace_' . $qrAccount->workspace_id . '_qr';
+            $title     = $meeting->title;
+            $dateTime  = $meeting->start_time->format('d M Y, h:i A');
+            $meetLink  = $meeting->meet_link ?? 'TBD';
+
+            $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink);
+
+            $payload = [
+                'sessionId' => $sessionId,
+                'to'        => $groupJid,
+                'template'  => $templateData,
+            ];
+
+            $response = Http::timeout(10)->post("{$this->qrServiceUrl}/api/messages/send-template", $payload);
+
+            if ($response->successful() && $response->json('success')) {
+                Log::info('[MeetingNotification] Direct group message sent to WhatsApp Group Chat.', [
+                    'group_jid' => $groupJid,
+                    'trigger'   => $trigger,
+                    'template'  => $templateName,
+                ]);
+                return 1;
+            }
+
+            Log::warning('[MeetingNotification] Direct group message failed.', [
+                'group_jid' => $groupJid,
+                'error'     => $response->body(),
+            ]);
+            return 0;
+        } catch (\Throwable $e) {
+            Log::error('[MeetingNotification] Direct group message exception.', [
+                'group_jid' => $groupJid,
+                'error'     => $e->getMessage(),
+            ]);
             return 0;
         }
     }
