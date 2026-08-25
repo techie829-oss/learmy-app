@@ -71,7 +71,7 @@ class MeetingController extends Controller
             'reminder_settings'          => 'nullable|array',
             'targets'                    => 'nullable|array',
             'targets.*.type'             => 'required_with:targets|string',
-            'targets.*.id'               => 'required_with:targets|integer',
+            'targets.*.id'               => 'nullable',
         ]);
 
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
