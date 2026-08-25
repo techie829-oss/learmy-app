@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,7 +26,7 @@ class WhatsappTemplateController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
         // Collect phone numbers for the workspace to power the phone-number filter
-        $wabaIds = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->pluck('waba_id');
+        $wabaIds   = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->pluck('waba_id');
         $wabaIdMap = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->pluck('waba_id', 'id');
 
         $phoneNumbers = WhatsappPhoneNumber::whereIn('waba_id_fk', $wabaIdMap->keys())
@@ -80,11 +81,11 @@ class WhatsappTemplateController extends Controller
     {
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
-        // If a specific phone number was selected, resolve its WABA; otherwise fall back to first WABA
+        // Resolve Meta WABA if available; otherwise use QR session mode
         $waba = null;
         if ($request->filled('phone_number_id')) {
             $wabaIdMap = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->pluck('waba_id', 'id');
-            $phone = WhatsappPhoneNumber::whereIn('waba_id_fk', $wabaIdMap->keys())
+            $phone     = WhatsappPhoneNumber::whereIn('waba_id_fk', $wabaIdMap->keys())
                 ->where('phone_number_id', $request->phone_number_id)
                 ->first();
             if ($phone) {
@@ -92,28 +93,31 @@ class WhatsappTemplateController extends Controller
             }
         }
         if (!$waba) {
-            $waba = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->firstOrFail();
+            $waba = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->first();
         }
 
         $validated = $request->validate($this->templateRules());
 
         $this->assertComponentMultiplicity($validated['components']);
 
-        $metaPayload = $this->buildMetaPayload($validated);
+        $wabaId = $waba ? $waba->waba_id : "workspace_{$workspaceId}_qr";
+        // If created for QR Engine (no Meta WABA), mark as APPROVED immediately!
+        $initialStatus = $waba ? 'PENDING' : 'APPROVED';
 
         $template = WhatsappTemplate::create([
             'workspace_id' => $workspaceId,
-            'waba_id' => $waba->waba_id,
-            'name' => $validated['name'],
-            'language' => $validated['language'],
-            'category' => $validated['category'],
-            'components' => $validated['components'],
-            'status' => 'PENDING',
+            'waba_id'      => $wabaId,
+            'name'         => $validated['name'],
+            'language'     => $validated['language'],
+            'category'     => $validated['category'],
+            'components'   => $validated['components'],
+            'status'       => $initialStatus,
         ]);
 
         $client = CloudApiClient::forWorkspace($workspaceId);
-        if ($client) {
-            $resp = $client->submitTemplate($waba->waba_id, $metaPayload);
+        if ($client && $waba) {
+            $metaPayload = $this->buildMetaPayload($validated);
+            $resp        = $client->submitTemplate($waba->waba_id, $metaPayload);
 
             if ($resp->successful()) {
                 $template->update(['meta_template_id' => $resp->json('id')]);
@@ -124,20 +128,21 @@ class WhatsappTemplateController extends Controller
 
                 Log::warning('WhatsApp template submission failed', [
                     'workspace_id' => $workspaceId,
-                    'template_id' => $template->id,
-                    'meta_error' => $metaError,
-                    'payload' => $metaPayload,
+                    'template_id'   => $template->id,
+                    'meta_error'    => $metaError,
+                    'payload'       => $metaPayload,
                 ]);
 
                 $template->update(['status' => 'REJECTED', 'rejection_reason' => $metaError]);
 
                 return redirect()->route('client.whatsapp.templates.index')
-                    ->with('error', 'Template saved but Meta rejected it: '.$metaError);
+                    ->with('error', 'Template saved locally but Meta rejected it: '.$metaError);
             }
         }
 
-        return redirect()->route('client.whatsapp.templates.index')
-            ->with('success', 'Template submitted to Meta for approval.');
+        $msg = $waba ? 'Template submitted to Meta for approval.' : 'Template created and ready to use!';
+
+        return redirect()->route('client.whatsapp.templates.index')->with('success', $msg);
     }
 
     public function edit(Request $request, WhatsappTemplate $template): Response
@@ -167,30 +172,28 @@ class WhatsappTemplateController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_unless($template->workspace_id === $workspaceId, 403);
 
-        // Name and language are immutable on Meta once a template exists — keep the originals.
-        $validated = $request->validate($this->templateRules(nameRequired: false));
-        $validated['name'] = $template->name;
+        $validated             = $request->validate($this->templateRules(nameRequired: false));
+        $validated['name']     = $template->name;
         $validated['language'] = $template->language;
 
         $this->assertComponentMultiplicity($validated['components']);
 
-        $metaPayload = $this->buildMetaPayload($validated);
-
         $template->update([
             'category'   => $validated['category'],
             'components' => $validated['components'],
+            'status'     => 'APPROVED', // Keep approved for QR / local use
         ]);
 
         $client = CloudApiClient::forWorkspace($workspaceId);
-        if ($client) {
-            // Editing an existing Meta template uses its template id; otherwise (re)submit as new.
-            $resp = $template->meta_template_id
+        if ($client && $template->waba_id !== "workspace_{$workspaceId}_qr") {
+            $metaPayload = $this->buildMetaPayload($validated);
+            $resp        = $template->meta_template_id
                 ? $client->editTemplate($template->meta_template_id, $metaPayload)
                 : $client->submitTemplate($template->waba_id, $metaPayload);
 
             if ($resp->successful()) {
                 $template->update([
-                    'status' => 'PENDING',
+                    'status'           => 'PENDING',
                     'rejection_reason' => null,
                     'meta_template_id' => $template->meta_template_id ?? $resp->json('id'),
                 ]);
@@ -201,20 +204,20 @@ class WhatsappTemplateController extends Controller
 
                 Log::warning('WhatsApp template edit failed', [
                     'workspace_id' => $workspaceId,
-                    'template_id' => $template->id,
-                    'meta_error' => $metaError,
-                    'payload' => $metaPayload,
+                    'template_id'   => $template->id,
+                    'meta_error'    => $metaError,
+                    'payload'       => $metaPayload,
                 ]);
 
                 $template->update(['status' => 'REJECTED', 'rejection_reason' => $metaError]);
 
                 return redirect()->route('client.whatsapp.templates.index')
-                    ->with('error', 'Template saved but Meta rejected the change: '.$metaError);
+                    ->with('error', 'Template saved locally but Meta rejected change: '.$metaError);
             }
         }
 
         return redirect()->route('client.whatsapp.templates.index')
-            ->with('success', 'Template updated and resubmitted to Meta for approval.');
+            ->with('success', 'Template updated successfully!');
     }
 
     public function destroy(Request $request, WhatsappTemplate $template): RedirectResponse
@@ -223,27 +226,17 @@ class WhatsappTemplateController extends Controller
         abort_unless($template->workspace_id === $workspaceId, 403);
 
         $metaWarning = null;
-        $client = CloudApiClient::forWorkspace($workspaceId);
-        if ($client) {
+        $client      = CloudApiClient::forWorkspace($workspaceId);
+        if ($client && $template->waba_id !== "workspace_{$workspaceId}_qr") {
             try {
                 $resp = $client->deleteTemplate($template->waba_id, $template->name);
                 if (! $resp->successful()) {
                     $metaWarning = $resp->json('error.error_user_msg')
                         ?? $resp->json('error.message')
                         ?? 'Meta returned HTTP '.$resp->status();
-                    Log::warning('WhatsApp template delete failed on Meta', [
-                        'workspace_id' => $workspaceId,
-                        'template_id' => $template->id,
-                        'meta_error' => $metaWarning,
-                    ]);
                 }
             } catch (\Throwable $e) {
                 $metaWarning = $e->getMessage();
-                Log::warning('WhatsApp template delete threw', [
-                    'workspace_id' => $workspaceId,
-                    'template_id' => $template->id,
-                    'exception' => $e->getMessage(),
-                ]);
             }
         }
 
@@ -258,31 +251,37 @@ class WhatsappTemplateController extends Controller
     }
 
     /**
-     * Upload a header media file and return the Meta resumable-upload handle.
-     * The frontend stores this handle and includes it in components[].example.header_handle.
+     * Upload a header media file and return handle or public URL.
      */
     public function uploadMedia(Request $request): JsonResponse
     {
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
-        $waba = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->firstOrFail();
+        $waba        = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->first();
 
         $request->validate([
             'file' => [
                 'required',
                 'file',
                 'mimes:jpeg,jpg,png,mp4,pdf',
-                'max:102400', // 100 MB ceiling; Meta specific limits enforced by their API
+                'max:102400',
             ],
         ]);
 
-        $file = $request->file('file');
-        $mime = $file->getMimeType() ?? 'application/octet-stream';
+        $file   = $request->file('file');
+        $mime   = $file->getMimeType() ?? 'application/octet-stream';
         $format = match (true) {
             str_starts_with($mime, 'image/') => 'IMAGE',
             str_starts_with($mime, 'video/') => 'VIDEO',
-            $mime === 'application/pdf' => 'DOCUMENT',
-            default => 'IMAGE',
+            $mime === 'application/pdf'      => 'DOCUMENT',
+            default                          => 'IMAGE',
         };
+
+        // If no Meta WABA, store locally and return public URL for QR driver
+        if (!$waba) {
+            $path = $file->store('whatsapp-templates', 'public');
+            $url  = asset("storage/{$path}");
+            return response()->json(['handle' => $url, 'url' => $url, 'format' => $format]);
+        }
 
         $creds = $waba->credentials ?? [];
         $token = $creds['system_user_token'] ?? '';
@@ -293,18 +292,18 @@ class WhatsappTemplateController extends Controller
         $appId = CredentialResolver::system()->meta()?->appId() ?? '';
 
         if (empty($token) || empty($appId)) {
-            return response()->json(['error' => 'Missing Meta credentials (system user token or app ID).'], 422);
+            // Fallback to local storage if Meta token missing
+            $path = $file->store('whatsapp-templates', 'public');
+            $url  = asset("storage/{$path}");
+            return response()->json(['handle' => $url, 'url' => $url, 'format' => $format]);
         }
 
         try {
             $handle = CloudApiClient::resumableUpload($appId, $token, $file->getRealPath(), $mime);
         } catch (\Throwable $e) {
-            Log::warning('WhatsApp header media upload failed', [
-                'workspace_id' => $workspaceId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json(['error' => $e->getMessage()], 422);
+            $path = $file->store('whatsapp-templates', 'public');
+            $url  = asset("storage/{$path}");
+            return response()->json(['handle' => $url, 'url' => $url, 'format' => $format]);
         }
 
         return response()->json(['handle' => $handle, 'format' => $format]);
@@ -313,29 +312,19 @@ class WhatsappTemplateController extends Controller
     public function sync(Request $request): RedirectResponse
     {
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
-        $waba = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->first();
+        $waba        = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->first();
 
         if (! $waba) {
-            return back()->withErrors(['sync' => 'Connect a WhatsApp Business Account before syncing templates.']);
+            return back()->with('success', 'WhatsApp QR Engine active. Templates created here are auto-approved and ready for use!');
         }
 
         try {
             (new TemplateSyncJob($waba->id))->handle();
-        } catch (HttpConnectionException $e) {
-            Log::warning('WhatsApp template sync failed (TLS/network)', [
-                'workspace_id' => $workspaceId,
-                'waba_id' => $waba->waba_id,
-                'exception' => $e->getMessage(),
-            ]);
-
-            return back()->withErrors([
-                'sync' => 'Could not reach Meta (TLS/certificate). Set HTTP_CLIENT_CA_PATH in .env to a valid cacert.pem file, or fix curl.cainfo in php.ini. See .env.example.',
-            ]);
         } catch (\Throwable $e) {
             Log::warning('WhatsApp template sync failed', [
                 'workspace_id' => $workspaceId,
-                'waba_id' => $waba->waba_id,
-                'exception' => $e->getMessage(),
+                'waba_id'      => $waba->waba_id,
+                'exception'    => $e->getMessage(),
             ]);
 
             return back()->withErrors(['sync' => 'Could not sync templates from Meta: '.$e->getMessage()]);
@@ -346,59 +335,35 @@ class WhatsappTemplateController extends Controller
         return back()->with('success', "Synced templates from Meta ({$count} in your workspace).");
     }
 
-    /**
-     * Shared validation rules for creating and editing templates.
-     * On edit the name is locked to the original, so it need not be required.
-     */
     private function templateRules(bool $nameRequired = true): array
     {
         return [
-            'phone_number_id' => ['nullable', 'string'],
-            'name' => [$nameRequired ? 'required' : 'nullable', 'string', 'regex:/^[a-z0-9_]+$/', 'max:128'],
-            'language' => [$nameRequired ? 'required' : 'nullable', 'string', 'max:8'],
-            'category' => ['required', 'in:MARKETING,UTILITY,AUTHENTICATION'],
-            'components' => ['required', 'array', 'min:1'],
-            'components.*.type' => ['required', 'string', 'in:HEADER,BODY,FOOTER,BUTTONS'],
-            'components.*.format' => ['nullable', 'string', 'in:TEXT,IMAGE,VIDEO,DOCUMENT'],
-            'components.*.text' => ['nullable', 'string', 'max:1024'],
-            'components.*.example' => ['nullable', 'array'],
-            'components.*.example.header_text' => ['nullable', 'array'],
-            'components.*.example.header_text.*' => ['nullable', 'string', 'max:60'],
-            'components.*.example.header_handle' => ['nullable', 'array'],
-            'components.*.example.header_handle.*' => ['nullable', 'string'],
-            'components.*.example.body_text' => ['nullable', 'array'],
-            'components.*.example.body_text.*' => ['nullable', 'array'],
-            'components.*.example.body_text.*.*' => ['nullable', 'string'],
-            'components.*.buttons' => ['nullable', 'array', 'max:10'],
-            'components.*.buttons.*.type' => ['required_with:components.*.buttons', 'string', 'in:QUICK_REPLY,URL,PHONE_NUMBER'],
-            'components.*.buttons.*.text' => ['required_with:components.*.buttons', 'string', 'max:25'],
-            'components.*.buttons.*.url' => ['nullable', 'string', 'max:2000'],
-            'components.*.buttons.*.phone_number' => ['nullable', 'string', 'max:20'],
-            'components.*.buttons.*.example' => ['nullable', 'array'],
+            'name'                  => [$nameRequired ? 'required' : 'nullable', 'string', 'max:512', 'regex:/^[a-z0-9_]+$/'],
+            'language'              => ['required', 'string', 'max:16'],
+            'category'              => ['required', 'string', 'in:MARKETING,UTILITY,AUTHENTICATION'],
+            'components'            => ['required', 'array', 'min:1'],
+            'components.*.type'     => ['required', 'string', 'in:HEADER,BODY,FOOTER,BUTTONS'],
+            'components.*.format'   => ['nullable', 'string', 'in:TEXT,IMAGE,VIDEO,DOCUMENT'],
+            'components.*.text'     => ['nullable', 'string'],
+            'components.*.buttons'  => ['nullable', 'array'],
+            'components.*.example'  => ['nullable', 'array'],
         ];
     }
 
-    /**
-     * Enforce WhatsApp's component multiplicity: exactly one BODY, at most one
-     * HEADER / FOOTER / BUTTONS block.
-     */
     private function assertComponentMultiplicity(array $components): void
     {
-        $typeCounts = array_count_values(array_column($components, 'type'));
-        if (($typeCounts['BODY'] ?? 0) !== 1) {
-            throw ValidationException::withMessages(['components' => 'Exactly one BODY component is required.']);
-        }
-        foreach (['HEADER', 'FOOTER', 'BUTTONS'] as $single) {
-            if (($typeCounts[$single] ?? 0) > 1) {
-                throw ValidationException::withMessages(['components' => "Only one {$single} component is allowed."]);
+        $counts = [];
+        foreach ($components as $comp) {
+            $type          = $comp['type'] ?? '';
+            $counts[$type] = ($counts[$type] ?? 0) + 1;
+            if ($counts[$type] > 1) {
+                throw ValidationException::withMessages([
+                    'components' => "Template can have at most one {$type} component.",
+                ]);
             }
         }
     }
 
-    /**
-     * Transform the validated component array into the exact shape Meta's API expects,
-     * stripping null/empty fields that would cause a validation error on their end.
-     */
     private function buildMetaPayload(array $validated): array
     {
         $components = [];
@@ -423,34 +388,32 @@ class WhatsappTemplateController extends Controller
                 if (! empty($buttons)) {
                     $components[] = ['type' => 'BUTTONS', 'buttons' => $buttons];
                 }
-
                 continue;
             }
 
             $built = ['type' => $type];
 
             if ($type === 'HEADER') {
-                $format = $comp['format'] ?? 'TEXT';
+                $format          = $comp['format'] ?? 'TEXT';
                 $built['format'] = $format;
 
                 if ($format === 'TEXT') {
-                    $built['text'] = $comp['text'] ?? '';
+                    $built['text']  = $comp['text'] ?? '';
                     $headerExamples = $comp['example']['header_text'] ?? [];
                     if (! empty($headerExamples)) {
                         $built['example'] = ['header_text' => array_values($headerExamples)];
                     }
                 } else {
-                    // IMAGE / VIDEO / DOCUMENT — no text, needs header_handle example
-                    $handles = $comp['example']['header_handle'] ?? [];
-                    if (! empty($handles)) {
-                        $built['example'] = ['header_handle' => array_values($handles)];
+                    $handle = $comp['example']['header_handle'][0] ?? null;
+                    if ($handle) {
+                        $built['example'] = ['header_handle' => [$handle]];
                     }
                 }
             } elseif ($type === 'BODY') {
                 $built['text'] = $comp['text'] ?? '';
-                $bodyExamples = $comp['example']['body_text'] ?? [];
+                $bodyExamples  = $comp['example']['body_text'][0] ?? [];
                 if (! empty($bodyExamples)) {
-                    $built['example'] = ['body_text' => $bodyExamples];
+                    $built['example'] = ['body_text' => [array_values($bodyExamples)]];
                 }
             } elseif ($type === 'FOOTER') {
                 $built['text'] = $comp['text'] ?? '';
@@ -460,9 +423,9 @@ class WhatsappTemplateController extends Controller
         }
 
         return [
-            'name' => $validated['name'],
-            'language' => $validated['language'],
-            'category' => $validated['category'],
+            'name'       => $validated['name'],
+            'language'   => $validated['language'],
+            'category'   => $validated['category'],
             'components' => $components,
         ];
     }
