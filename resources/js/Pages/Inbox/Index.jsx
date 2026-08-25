@@ -20,7 +20,9 @@ const FOLDERS = [
     { key: 'snoozed',    labelKey: 'inbox.folder_snoozed',    icon: Clock },
 ];
 
-const ALL_CHANNELS = ['whatsapp', 'instagram', 'messenger', 'sms', 'email'];
+// Only show channels that have active backend drivers configured.
+// Email (IMAP) and SMS are not yet supported as inbox channels.
+const ALL_CHANNELS = ['whatsapp', 'instagram', 'messenger'];
 
 function StatusDot({ status }) {
     const colors = {
