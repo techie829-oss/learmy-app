@@ -420,7 +420,7 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
                                     {/* Import Groups Link */}
                                     <div className="pt-2 border-t border-green-200/50 dark:border-green-800/30 flex items-center justify-between">
                                         <Link
-                                            href={route('whatsapp.groups.index')}
+                                            href={route('client.whatsapp.groups.index')}
                                             className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 hover:underline"
                                         >
                                             <ExternalLink className="h-3.5 w-3.5" />
