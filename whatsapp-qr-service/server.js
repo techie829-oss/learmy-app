@@ -127,7 +127,29 @@ async function getOrCreateSession(sessionId) {
 
         for (const msg of messages) {
             if (!msg.message || msg.key.fromMe) continue;
-            notifyLaravel(sessionId, 'inbound_message', { message: msg });
+
+            let realPhone = null;
+            let senderJid = msg.key.remoteJid || '';
+
+            // Handle WhatsApp LID (Linked Identity ID e.g. 32495856832586@lid)
+            if (senderJid.endsWith('@lid')) {
+                if (msg.key.participant && msg.key.participant.endsWith('@s.whatsapp.net')) {
+                    senderJid = msg.key.participant;
+                } else if (msg.participant && msg.participant.endsWith('@s.whatsapp.net')) {
+                    senderJid = msg.participant;
+                } else if (msg.key.remoteJidAlt && msg.key.remoteJidAlt.endsWith('@s.whatsapp.net')) {
+                    senderJid = msg.key.remoteJidAlt;
+                }
+            }
+
+            if (senderJid.endsWith('@s.whatsapp.net')) {
+                realPhone = senderJid.split('@')[0];
+            }
+
+            notifyLaravel(sessionId, 'inbound_message', {
+                message: msg,
+                phone: realPhone
+            });
         }
     });
 

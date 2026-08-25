@@ -100,12 +100,12 @@ class QrWebhookController extends Controller
         $msgKey = $baileysMsg['key'] ?? [];
 
         $fromJid = $msgKey['remoteJid'] ?? '';
-        $cleanPhone = explode('@', $fromJid)[0] ?? '';
+        $cleanPhone = !empty($data['phone']) ? $data['phone'] : (explode('@', $fromJid)[0] ?? '');
         if (empty($cleanPhone)) {
             return;
         }
 
-        $phoneE164 = '+'.$cleanPhone;
+        $phoneE164 = str_starts_with($cleanPhone, '+') ? $cleanPhone : '+'.$cleanPhone;
         $workspaceId = $account->workspace_id;
 
         // Upsert contact
