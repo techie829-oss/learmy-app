@@ -103,6 +103,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'redirect.if.admin' => RedirectIfAdminAuthenticated::class,
             'client.scope' => EnsureClientScope::class,
             'api.ability' => CheckApiAbility::class,
+            'limit' => \App\Http\Middleware\EnsureFeatureLimit::class,
         ]);
         // Shared middleware stack for all client module routes (mirrors routes/client.php).
         $middleware->appendToGroup('client-app', [
