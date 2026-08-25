@@ -49,7 +49,8 @@ class Campaign extends Model
     }
 
     protected $fillable = [
-        'workspace_id', 'name', 'channel', 'whatsapp_phone_number_id', 'audience_type', 'audience_ref',
+        'workspace_id', 'name', 'channel', 'whatsapp_phone_number_id', 'channel_account_id',
+        'audience_type', 'audience_ref',
         'template_ref', 'payload_json', 'schedule_at', 'timezone', 'status', 'totals_json', 'created_by',
     ];
 

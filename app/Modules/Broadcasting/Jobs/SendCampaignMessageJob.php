@@ -151,6 +151,11 @@ class SendCampaignMessageJob implements ShouldQueue
      */
     private function sendWhatsApp(Campaign $campaign, Contact $contact, CampaignPersonalizer $personalizer): array
     {
+        // Route to QR / Baileys driver if the campaign was created with a QR account.
+        if ($campaign->channel_account_id) {
+            return $this->sendWhatsAppQr($campaign, $contact, $personalizer);
+        }
+
         $client = $campaign->whatsapp_phone_number_id
             ? CloudApiClient::forPhoneNumber($campaign->whatsapp_phone_number_id, $campaign->workspace_id)
             : CloudApiClient::forWorkspace($campaign->workspace_id);
@@ -217,6 +222,113 @@ class SendCampaignMessageJob implements ShouldQueue
                 'template' => $template,
             ],
         ];
+    }
+
+    /**
+     * Send a WhatsApp message via the QR / Baileys Node.js microservice.
+     * Supports both free-text (payload_json.body) and template messages.
+     *
+     * @return array{id: string, body: string, type: string, payload: array<string, mixed>}
+     */
+    private function sendWhatsAppQr(Campaign $campaign, Contact $contact, CampaignPersonalizer $personalizer): array
+    {
+        $account = ChannelAccount::find($campaign->channel_account_id);
+        if (! $account) {
+            throw new \RuntimeException('QR channel account not found (id='.$campaign->channel_account_id.').');
+        }
+
+        $sessionId = $account->meta_json['session_id'] ?? ('workspace_'.$campaign->workspace_id.'_qr');
+        $serviceUrl = config('services.whatsapp_qr.url', 'http://127.0.0.1:3001');
+
+        $phone = $contact->phone_e164;
+        if (! str_starts_with((string) $phone, '+')) {
+            $phone = '+'.$phone;
+        }
+
+        // Determine message body: template preview text or free-text body.
+        $tpl  = $campaign->template_ref ?? [];
+        $body = '';
+
+        if (! empty($tpl['name'])) {
+            // Use template body text as the message.
+            $body = $this->resolveQrTemplateBody($campaign, $tpl, $contact, $personalizer);
+        } else {
+            $body = $personalizer->renderText($campaign->payload_json['body'] ?? '', $contact);
+        }
+
+        if (trim($body) === '') {
+            throw new \RuntimeException('Message body is empty.');
+        }
+
+        $payload = [
+            'sessionId' => $sessionId,
+            'to'        => $phone,
+            'text'      => $body,
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::post("{$serviceUrl}/api/messages/send", $payload);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException('WhatsApp QR send failed: '.$response->body());
+        }
+
+        $messageId = $response->json('messageId', 'qr_'.uniqid());
+
+        return [
+            'id'      => $messageId,
+            'body'    => $body,
+            'type'    => 'text',
+            'payload' => ['body' => $body],
+        ];
+    }
+
+    /**
+     * Resolve a WhatsApp template's body text for QR sending.
+     * Substitutes {{N}} placeholders with personalizer values.
+     */
+    private function resolveQrTemplateBody(Campaign $campaign, array $tpl, Contact $contact, CampaignPersonalizer $personalizer): string
+    {
+        $template = WhatsappTemplate::where('workspace_id', $campaign->workspace_id)
+            ->where('name', $tpl['name'] ?? '')
+            ->where('language', $tpl['language'] ?? 'en')
+            ->first();
+
+        if (! $template) {
+            // Fall back to personalizing whatever body is stored.
+            return $personalizer->renderText($campaign->payload_json['body'] ?? '', $contact);
+        }
+
+        // Find the BODY component in canonical components.
+        $bodyText = '';
+        foreach ((array) ($template->components ?? []) as $comp) {
+            if (strtolower((string) ($comp['type'] ?? '')) === 'body') {
+                $bodyText = $comp['text'] ?? '';
+                break;
+            }
+        }
+
+        if ($bodyText === '') {
+            return $personalizer->renderText($campaign->payload_json['body'] ?? '', $contact);
+        }
+
+        // Substitute {{N}} placeholders with rendered parameter values.
+        $params = [];
+        foreach ((array) ($tpl['components'] ?? []) as $comp) {
+            if (strtolower((string) ($comp['type'] ?? '')) === 'body') {
+                $params = $comp['parameters'] ?? [];
+                break;
+            }
+        }
+
+        $i = 0;
+        $bodyText = preg_replace_callback('/\{\{\s*(\d+)\s*\}\}/', function () use (&$i, $params, $contact, $personalizer) {
+            $param = $params[$i++] ?? null;
+            $value = is_array($param) ? ($param['text'] ?? '') : '';
+            // If value looks like a token, personalise it.
+            return $personalizer->renderText($value, $contact);
+        }, $bodyText);
+
+        return $bodyText ?: '';
     }
 
     /**

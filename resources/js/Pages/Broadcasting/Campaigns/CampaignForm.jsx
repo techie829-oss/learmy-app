@@ -83,6 +83,7 @@ function defaultInitialData(campaign, userTz) {
         name: '',
         channel: 'whatsapp',
         whatsapp_phone_number_id: '',
+        channel_account_id: null,
         audience_type: 'segment',
         audience_ref: '',
         template_ref: { name: '', language: 'en', components: [] },
@@ -288,13 +289,22 @@ export default function CampaignForm({
     // We keep the slot user-input separately and only marshal back into Meta shape on submit.
     const [slots, setSlots] = useState(() => deriveSlotsFromTemplate(selectedTemplate?.components ?? []));
 
-    // Auto-select the only phone number when switching to WhatsApp with a single number.
+    // Auto-select the only phone number / QR account when switching to WhatsApp.
     useEffect(() => {
-        if (data.channel === 'whatsapp' && whatsappPhoneNumbers.length === 1 && !data.whatsapp_phone_number_id) {
-            setData('whatsapp_phone_number_id', whatsappPhoneNumbers[0].phone_number_id);
+        if (data.channel === 'whatsapp' && whatsappPhoneNumbers.length === 1) {
+            const acct = whatsappPhoneNumbers[0];
+            if (acct.provider === 'qr_baileys') {
+                if (!data.channel_account_id) {
+                    setData((d) => ({ ...d, channel_account_id: acct.channel_account_id, whatsapp_phone_number_id: '' }));
+                }
+            } else {
+                if (!data.whatsapp_phone_number_id) {
+                    setData((d) => ({ ...d, whatsapp_phone_number_id: acct.phone_number_id, channel_account_id: null }));
+                }
+            }
         }
-        if (data.channel !== 'whatsapp' && data.whatsapp_phone_number_id) {
-            setData('whatsapp_phone_number_id', '');
+        if (data.channel !== 'whatsapp') {
+            setData((d) => ({ ...d, whatsapp_phone_number_id: '', channel_account_id: null }));
         }
     }, [data.channel]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -390,6 +400,7 @@ export default function CampaignForm({
                 name: data.name,
                 channel: data.channel,
                 whatsapp_phone_number_id: data.whatsapp_phone_number_id || null,
+                channel_account_id: data.channel_account_id || null,
                 audience_type: data.audience_type,
                 audience_ref: data.audience_ref || null,
                 template_ref: data.template_ref,
@@ -419,11 +430,18 @@ export default function CampaignForm({
     };
     const prev = () => setStep((s) => Math.max(s - 1, 0));
 
+    // Detect if the selected account is a QR/Baileys account.
+    const selectedQrAccount = useMemo(() => {
+        if (data.channel !== 'whatsapp') return null;
+        if (!data.channel_account_id) return null;
+        return whatsappPhoneNumbers.find((p) => p.provider === 'qr_baileys' && p.channel_account_id === data.channel_account_id) ?? null;
+    }, [whatsappPhoneNumbers, data.channel, data.channel_account_id]);
+
     const isStepValid = useMemo(() => {
         if (step === 0) {
             if (!data.name.trim() || !data.channel) return false;
-            // When WhatsApp is selected and there are multiple numbers, one must be chosen.
-            if (data.channel === 'whatsapp' && whatsappPhoneNumbers.length > 1 && !data.whatsapp_phone_number_id) {
+            // When WhatsApp is selected and there are multiple accounts, one must be chosen.
+            if (data.channel === 'whatsapp' && whatsappPhoneNumbers.length > 1 && !data.whatsapp_phone_number_id && !data.channel_account_id) {
                 return false;
             }
             return true;
@@ -436,6 +454,10 @@ export default function CampaignForm({
         }
         if (step === 2) {
             if (data.channel === 'whatsapp') {
+                // QR account: allow free-text body OR template
+                if (selectedQrAccount) {
+                    return !!data.template_ref.name || (data.payload_json.body || '').trim().length > 0;
+                }
                 return !!data.template_ref.name;
             }
             if (data.channel === 'sms') return (data.payload_json.body || '').trim().length > 0;
@@ -447,7 +469,7 @@ export default function CampaignForm({
             }
         }
         return true;
-    }, [step, data]);
+    }, [step, data, selectedQrAccount]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -587,6 +609,7 @@ export default function CampaignForm({
                                 insertTokenIntoTextarea={insertTokenIntoTextarea}
                                 errors={errors}
                                 campaignName={data.name}
+                                isQrAccount={!!selectedQrAccount}
                             />
                         )}
 
@@ -735,10 +758,13 @@ function ChannelStep({ data, setData, errors, whatsappPhoneNumbers = [] }) {
                         {t('campaign.send_from')}
                     </label>
                     {whatsappPhoneNumbers.length === 1 ? (
-                        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300">
-                            {whatsappPhoneNumbers[0].display_phone}
+                        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
+                            {whatsappPhoneNumbers[0].provider === 'qr_baileys' && (
+                                <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">QR Connected</span>
+                            )}
+                            <span>{whatsappPhoneNumbers[0].display_phone}</span>
                             {whatsappPhoneNumbers[0].verified_name && (
-                                <span className="ml-2 text-neutral-500 dark:text-neutral-400">
+                                <span className="text-neutral-500 dark:text-neutral-400">
                                     — {whatsappPhoneNumbers[0].verified_name}
                                 </span>
                             )}
@@ -746,18 +772,30 @@ function ChannelStep({ data, setData, errors, whatsappPhoneNumbers = [] }) {
                     ) : (
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {whatsappPhoneNumbers.map((p) => {
-                                const active = data.whatsapp_phone_number_id === p.phone_number_id;
+                                const key = p.provider === 'qr_baileys' ? `qr_${p.channel_account_id}` : p.phone_number_id;
+                                const active = p.provider === 'qr_baileys'
+                                    ? data.channel_account_id === p.channel_account_id
+                                    : data.whatsapp_phone_number_id === p.phone_number_id;
                                 return (
                                     <button
-                                        key={p.phone_number_id}
+                                        key={key}
                                         type="button"
-                                        onClick={() => setData('whatsapp_phone_number_id', p.phone_number_id)}
+                                        onClick={() => {
+                                            if (p.provider === 'qr_baileys') {
+                                                setData((d) => ({ ...d, channel_account_id: p.channel_account_id, whatsapp_phone_number_id: '' }));
+                                            } else {
+                                                setData((d) => ({ ...d, whatsapp_phone_number_id: p.phone_number_id, channel_account_id: null }));
+                                            }
+                                        }}
                                         className={`rounded-xl border p-3 text-sm font-medium transition flex flex-col items-start gap-0.5 text-left ${
                                             active
                                                 ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300'
                                                 : 'border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:border-brand-300'
                                         }`}
                                     >
+                                        {p.provider === 'qr_baileys' && (
+                                            <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-300 mb-0.5">📱 QR</span>
+                                        )}
                                         <span>{p.display_phone}</span>
                                         {p.verified_name && (
                                             <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
@@ -770,6 +808,7 @@ function ChannelStep({ data, setData, errors, whatsappPhoneNumbers = [] }) {
                         </div>
                     )}
                     <FieldError message={errors.whatsapp_phone_number_id} />
+                    <FieldError message={errors.channel_account_id} />
                 </div>
             )}
 
@@ -978,6 +1017,7 @@ function ContentStep({
     insertTokenIntoTextarea,
     errors,
     campaignName,
+    isQrAccount = false,
 }) {
     const { t } = useTranslation();
     return (
@@ -986,9 +1026,33 @@ function ContentStep({
 
             {data.channel === 'whatsapp' && (
                 <>
+                    {/* QR account: free-text message body (primary) */}
+                    {isQrAccount && (
+                        <div>
+                            <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">📱 QR</span>
+                                Message (free text)
+                            </label>
+                            <textarea
+                                rows={5}
+                                value={data.payload_json.body}
+                                onChange={(e) => setData('payload_json', { ...data.payload_json, body: e.target.value })}
+                                placeholder="Type your WhatsApp message here... Use {{contact.first_name}} for personalization"
+                                className={`${inputClass} resize-y`}
+                            />
+                            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                Tokens: <code className="bg-neutral-100 dark:bg-neutral-700 px-1 rounded">{'{{contact.first_name}}'}</code>{' '}
+                                <code className="bg-neutral-100 dark:bg-neutral-700 px-1 rounded">{'{{contact.last_name}}'}</code>{' '}
+                                <code className="bg-neutral-100 dark:bg-neutral-700 px-1 rounded">{'{{contact.phone_e164}}'}</code>
+                            </p>
+                            <FieldError message={errors['payload_json.body']} />
+                        </div>
+                    )}
+
+                    {/* Template selection (required for Meta Cloud API; optional for QR) */}
                     <div>
                         <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            {t('campaign.whatsapp_template')}
+                            {isQrAccount ? 'WhatsApp Template (optional — overrides free text)' : t('campaign.whatsapp_template')}
                         </label>
                         <select
                             value={
@@ -1015,7 +1079,7 @@ function ContentStep({
                             }}
                             className={inputClass}
                         >
-                            <option value="">{t('campaign.select_template')}</option>
+                            <option value="">{isQrAccount ? '— No template (use free text above) —' : t('campaign.select_template')}</option>
                             {whatsappTemplates.map((tpl) => (
                                 <option key={tpl.id} value={tpl.id}>
                                     {tpl.name} ({tpl.language}) — {tpl.status}
@@ -1024,7 +1088,7 @@ function ContentStep({
                         </select>
                         {whatsappTemplates.length === 0 && (
                             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                {t('campaign.no_templates_synced')}
+                                {isQrAccount ? 'No templates synced — use free text above.' : t('campaign.no_templates_synced')}
                             </p>
                         )}
                         <FieldError message={errors['template_ref.name']} />

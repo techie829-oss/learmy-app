@@ -9,6 +9,7 @@ use App\Modules\Broadcasting\Models\CampaignRecipient;
 use App\Modules\Broadcasting\Models\UsageMeter;
 use App\Modules\Broadcasting\Services\CampaignPersonalizer;
 use App\Modules\Broadcasting\Services\Sms\SmsDriverManager;
+use App\Modules\Shared\Models\ChannelAccount;
 use App\Modules\Shared\Models\Contact;
 use App\Modules\Shared\Models\ContactTag;
 use App\Modules\Shared\Models\Segment;
@@ -79,6 +80,7 @@ class CampaignController extends Controller
             'name'                      => ['required', 'string', 'max:128'],
             'channel'                   => ['required', 'in:whatsapp,sms,email'],
             'whatsapp_phone_number_id'  => ['nullable', 'string'],
+            'channel_account_id'        => ['nullable', 'integer'],
             'audience_type'             => ['nullable', 'in:segment,contact_list,tag,csv'],
             'audience_ref'              => ['nullable', 'string'],
             'template_ref'              => ['nullable', 'array'],
@@ -91,6 +93,7 @@ class CampaignController extends Controller
             'name'                     => $validated['name'],
             'channel'                  => $validated['channel'],
             'whatsapp_phone_number_id' => $validated['whatsapp_phone_number_id'] ?? null,
+            'channel_account_id'       => $validated['channel_account_id'] ?? null,
             'audience_type'            => $validated['audience_type'] ?? null,
             'audience_ref'             => $validated['audience_ref'] ?? null,
             'template_ref'             => $validated['template_ref'] ?? null,
@@ -376,6 +379,7 @@ class CampaignController extends Controller
             'name'                     => ['required', 'string', 'max:128'],
             'channel'                  => ['required', 'in:whatsapp,sms,email'],
             'whatsapp_phone_number_id' => ['nullable', 'string'],
+            'channel_account_id'       => ['nullable', 'integer'],
             'audience_type'            => ['required', 'in:segment,contact_list,tag,csv'],
             'audience_ref'             => ['nullable', 'string'],
             'template_ref'             => ['nullable', 'array'],
@@ -390,6 +394,29 @@ class CampaignController extends Controller
      */
     private function assertWhatsAppCampaignReady(Campaign $campaign): void
     {
+        // QR / Baileys account — no Meta client required; free-text messages supported.
+        if ($campaign->channel_account_id) {
+            $account = ChannelAccount::where('workspace_id', $campaign->workspace_id)
+                ->where('id', $campaign->channel_account_id)
+                ->where('provider', 'qr_baileys')
+                ->where('status', 'active')
+                ->first();
+
+            if (! $account) {
+                abort(422, 'The selected WhatsApp QR account is not connected. Please reconnect it first.');
+            }
+
+            // For QR accounts, either a template or a free-text body must be set.
+            $tpl  = $campaign->template_ref ?? [];
+            $body = $campaign->payload_json['body'] ?? '';
+            if (empty($tpl['name']) && trim((string) $body) === '') {
+                abort(422, 'Enter a message body or select a template before launching.');
+            }
+
+            return;
+        }
+
+        // Meta Cloud API account — template required.
         $client = $campaign->whatsapp_phone_number_id
             ? CloudApiClient::forPhoneNumber($campaign->whatsapp_phone_number_id, $campaign->workspace_id)
             : CloudApiClient::forWorkspace($campaign->workspace_id);
@@ -439,6 +466,7 @@ class CampaignController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'color']);
 
+        // Meta Cloud API phone numbers (WABA-based)
         $whatsappPhoneNumbers = WhatsappBusinessAccount::where('workspace_id', $workspaceId)
             ->where('status', 'active')
             ->with('phoneNumbers')
@@ -448,12 +476,31 @@ class CampaignController extends Controller
                 'display_phone'   => $p->display_phone,
                 'verified_name'   => $p->verified_name,
                 'waba_id'         => $waba->waba_id,
+                'provider'        => 'cloud_api',
             ]))
             ->values();
 
+        // QR / Baileys accounts — also available as WhatsApp senders
+        $qrAccounts = ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('channel', 'whatsapp')
+            ->where('provider', 'qr_baileys')
+            ->where('status', 'active')
+            ->get()
+            ->map(fn ($acc) => [
+                'phone_number_id' => null,
+                'channel_account_id' => $acc->id,
+                'display_phone'   => $acc->meta_json['connected_phone'] ?? $acc->display_name,
+                'verified_name'   => $acc->display_name,
+                'waba_id'         => null,
+                'provider'        => 'qr_baileys',
+            ])
+            ->values();
+
+        $allWhatsappAccounts = $whatsappPhoneNumbers->merge($qrAccounts)->values();
+
         return [
             'whatsappTemplates'    => $whatsappTemplates,
-            'whatsappPhoneNumbers' => $whatsappPhoneNumbers,
+            'whatsappPhoneNumbers' => $allWhatsappAccounts,
             'segments'             => $segments,
             'tags'                 => $tags,
             'contactTokens'        => CampaignPersonalizer::availableContactTokens(),
@@ -512,6 +559,39 @@ class CampaignController extends Controller
             throw new \RuntimeException('Phone is required for a WhatsApp test send.');
         }
 
+        $phone = $contact->phone_e164;
+        if (! str_starts_with($phone, '+')) {
+            $phone = '+'.$phone;
+        }
+
+        // QR / Baileys path — free-text or template body as plain text.
+        if ($campaign->channel_account_id) {
+            $account = ChannelAccount::find($campaign->channel_account_id);
+            if (! $account) {
+                throw new \RuntimeException('QR channel account not found.');
+            }
+            $sessionId  = $account->meta_json['session_id'] ?? ('workspace_'.$campaign->workspace_id.'_qr');
+            $serviceUrl = config('services.whatsapp_qr.url', 'http://127.0.0.1:3001');
+
+            $body = $personalizer->renderText($campaign->payload_json['body'] ?? '', $contact);
+            if (trim($body) === '') {
+                $body = '[TEST] '.$campaign->name;
+            }
+
+            $response = \Illuminate\Support\Facades\Http::post("{$serviceUrl}/api/messages/send", [
+                'sessionId' => $sessionId,
+                'to'        => $phone,
+                'text'      => '[TEST] '.$body,
+            ]);
+
+            if (! $response->successful()) {
+                throw new \RuntimeException('QR test send failed: '.$response->body());
+            }
+
+            return $response->json('messageId', 'qr_test_'.uniqid());
+        }
+
+        // Meta Cloud API path.
         $client = $campaign->whatsapp_phone_number_id
             ? CloudApiClient::forPhoneNumber($campaign->whatsapp_phone_number_id, $campaign->workspace_id)
             : CloudApiClient::forWorkspace($campaign->workspace_id);
@@ -526,11 +606,6 @@ class CampaignController extends Controller
 
         if ($name === '') {
             throw new \RuntimeException('Pick a WhatsApp template before sending a test.');
-        }
-
-        $phone = $contact->phone_e164;
-        if (! str_starts_with($phone, '+')) {
-            $phone = '+'.$phone;
         }
 
         $rendered = $personalizer->renderTemplateComponents($components, $contact);
