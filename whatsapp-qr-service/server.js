@@ -62,7 +62,7 @@ async function getOrCreateSession(sessionId) {
         browser: Browsers.macOS('Chrome'), // Simulates standard macOS Google Chrome to avoid VPS IP security flags
         keepAliveIntervalMs: 30000, // Ping socket every 30s to prevent Malaysia VPS TCP drops
         markOnlineOnConnect: true,
-        syncFullHistory: false, // Prevents loading thousands of old messages which triggers WhatsApp rate limits
+        syncFullHistory: true, // Enables full WhatsApp Web chat and contact history syncing on connect
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, logger)
@@ -164,6 +164,54 @@ async function getOrCreateSession(sessionId) {
                     });
                 }
                 lidMap.set(c.id, phone);
+            }
+        }
+    });
+
+    sock.ev.on('messaging-history.set', ({ contacts, chats, messages, isLatest }) => {
+        console.log(`[Messaging History Set] Session: ${sessionId} | Contacts: ${contacts?.length || 0} | Messages: ${messages?.length || 0}`);
+
+        // 1. Map contacts from WhatsApp Web history sync
+        if (Array.isArray(contacts)) {
+            for (const c of contacts) {
+                if (c.id && c.id.endsWith('@s.whatsapp.net')) {
+                    const phone = c.id.split('@')[0];
+                    if (c.lid) {
+                        const cleanLid = c.lid.split('@')[0];
+                        lidMap.set(c.lid, phone);
+                        lidMap.set(cleanLid, phone);
+                        notifyLaravel(sessionId, 'lid_resolved', {
+                            lid: cleanLid,
+                            phone: phone,
+                            name: c.name || c.notify || null
+                        });
+                    }
+                    lidMap.set(c.id, phone);
+                }
+            }
+        }
+
+        // 2. Process history messages to sync past chat history into Learmy Inbox
+        if (Array.isArray(messages)) {
+            for (const msg of messages) {
+                if (!msg.message || msg.key.fromMe) continue;
+                let senderJid = msg.key.remoteJid || '';
+                if (senderJid === 'status@broadcast') continue;
+
+                let realPhone = null;
+                if (senderJid.endsWith('@lid')) {
+                    const rawLid = senderJid.split('@')[0];
+                    if (lidMap.has(senderJid)) realPhone = lidMap.get(senderJid);
+                    else if (lidMap.has(rawLid)) realPhone = lidMap.get(rawLid);
+                    else realPhone = rawLid;
+                } else {
+                    realPhone = senderJid.split('@')[0];
+                }
+
+                notifyLaravel(sessionId, 'inbound_message', {
+                    message: msg,
+                    phone: realPhone
+                });
             }
         }
     });
