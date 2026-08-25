@@ -50,9 +50,10 @@ class WhatsappTemplateController extends Controller
             ->latest()->get();
 
         return Inertia::render('Whatsapp/Templates/Index', [
-            'templates'    => $templates,
-            'phoneNumbers' => $phoneNumbers,
-            'filters'      => $request->only('status', 'search', 'phone_number_id'),
+            'templates'     => $templates,
+            'phoneNumbers'  => $phoneNumbers,
+            'filters'       => $request->only('status', 'search', 'phone_number_id'),
+            'metaConnected' => $wabaIds->isNotEmpty(),
         ]);
     }
 
@@ -101,7 +102,6 @@ class WhatsappTemplateController extends Controller
         $this->assertComponentMultiplicity($validated['components']);
 
         $wabaId = $waba ? $waba->waba_id : "workspace_{$workspaceId}_qr";
-        // If created for QR Engine (no Meta WABA), mark as APPROVED immediately!
         $initialStatus = $waba ? 'PENDING' : 'APPROVED';
 
         $template = WhatsappTemplate::create([
@@ -181,7 +181,7 @@ class WhatsappTemplateController extends Controller
         $template->update([
             'category'   => $validated['category'],
             'components' => $validated['components'],
-            'status'     => 'APPROVED', // Keep approved for QR / local use
+            'status'     => 'APPROVED',
         ]);
 
         $client = CloudApiClient::forWorkspace($workspaceId);
@@ -276,7 +276,6 @@ class WhatsappTemplateController extends Controller
             default                          => 'IMAGE',
         };
 
-        // If no Meta WABA, store locally and return public URL for QR driver
         if (!$waba) {
             $path = $file->store('whatsapp-templates', 'public');
             $url  = asset("storage/{$path}");
@@ -292,7 +291,6 @@ class WhatsappTemplateController extends Controller
         $appId = CredentialResolver::system()->meta()?->appId() ?? '';
 
         if (empty($token) || empty($appId)) {
-            // Fallback to local storage if Meta token missing
             $path = $file->store('whatsapp-templates', 'public');
             $url  = asset("storage/{$path}");
             return response()->json(['handle' => $url, 'url' => $url, 'format' => $format]);

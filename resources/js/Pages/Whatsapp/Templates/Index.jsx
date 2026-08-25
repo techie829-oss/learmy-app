@@ -13,7 +13,7 @@ const STATUS_CONFIG = {
     PAUSED:   { color: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300', icon: <PauseCircle className="h-3 w-3" />, label: 'Paused' },
 };
 
-export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = [], filters = {} }) {
+export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = [], filters = {}, metaConnected = false }) {
     const { t } = useTranslation();
     const { props } = usePage();
     const flash = props?.flash ?? {};
@@ -74,12 +74,14 @@ export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = 
                         >
                             <BookOpen className="h-4 w-4" /> {showGuide ? 'Hide Guide' : '📖 Variables Guide'}
                         </button>
-                        <button
-                            onClick={handleSync}
-                            className="flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-                        >
-                            <RefreshCw className="h-4 w-4" /> Sync / Refresh
-                        </button>
+                        {metaConnected && (
+                            <button
+                                onClick={handleSync}
+                                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                            >
+                                <RefreshCw className="h-4 w-4" /> Sync / Refresh Meta
+                            </button>
+                        )}
                         <Link
                             href={route('client.whatsapp.templates.create')}
                             className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-green-700 transition"
@@ -224,7 +226,6 @@ export default function WhatsappTemplatesIndex({ templates = [], phoneNumbers = 
                                 title="No WhatsApp templates yet"
                                 description="Create custom rich WhatsApp templates with text, header images/videos, variables, and CTA buttons."
                                 action={{ label: "+ Create Template", href: route('client.whatsapp.templates.create') }}
-                                secondaryAction={{ label: "Refresh / Sync", onClick: handleSync }}
                             />
                         </div>
                     )}

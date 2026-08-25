@@ -152,7 +152,7 @@ class MeetingNotificationService
                 ->first();
 
             if ($dbTemplate && !empty($dbTemplate->components)) {
-                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $firstName, $title, $dateTime, $meetLink, $meeting->description);
+                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $contact, $meeting);
             } else {
                 $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink);
             }
@@ -190,15 +190,22 @@ class MeetingNotificationService
 
     /**
      * Render a custom WhatsappTemplate from DB by replacing dynamic variables:
-     * {{1}} / {{first_name}} / {{name}} -> Student Name
-     * {{2}} / {{title}} / {{class_title}} -> Class Title
-     * {{3}} / {{start_time}} / {{date_time}} -> Class Time
-     * {{4}} / {{meet_link}} / {{link}} -> Google Meet URL
-     * {{5}} / {{description}} -> Class Description
+     * - {{1}} / {{first_name}} / {{name}} -> Student Name
+     * - {{2}} / {{title}} / {{class_title}} -> Class Title
+     * - {{3}} / {{start_time}} / {{date_time}} -> Class Time
+     * - {{4}} / {{meet_link}} / {{link}} -> Google Meet URL
+     * - {{5}} / {{description}} -> Class Description
+     * - Any contact field or custom attribute (e.g. {{email}}, {{phone}}, {{city}}, {{course}})
      */
-    private function renderCustomDbTemplate(array $components, string $firstName, string $title, string $dateTime, ?string $meetLink, ?string $description): array
+    private function renderCustomDbTemplate(array $components, Contact $contact, Meeting $meeting): array
     {
-        $replaceVars = function (string $text) use ($firstName, $title, $dateTime, $meetLink, $description): string {
+        $firstName   = $contact->first_name ?? $contact->full_name ?? 'Student';
+        $title       = $meeting->title;
+        $dateTime    = $meeting->start_time->format('d M Y, h:i A');
+        $meetLink    = $meeting->meet_link ?? 'TBD';
+        $description = $meeting->description ?? '';
+
+        $replaceVars = function (string $text) use ($contact, $firstName, $title, $dateTime, $meetLink, $description): string {
             $replacements = [
                 '{{1}} font'        => $firstName,
                 '{{1}}'             => $firstName,
@@ -212,12 +219,24 @@ class MeetingNotificationService
                 '{{start_time}}'    => $dateTime,
                 '{{date_time}}'     => $dateTime,
                 '{{time}}'          => $dateTime,
-                '{{4}}'             => $meetLink ?? 'TBD',
-                '{{meet_link}}'     => $meetLink ?? 'TBD',
-                '{{link}}'          => $meetLink ?? 'TBD',
-                '{{5}}'             => $description ?? '',
-                '{{description}}'   => $description ?? '',
+                '{{4}}'             => $meetLink,
+                '{{meet_link}}'     => $meetLink,
+                '{{link}}'          => $meetLink,
+                '{{5}}'             => $description,
+                '{{description}}'   => $description,
+                '{{email}}'         => $contact->email ?? '',
+                '{{phone}}'         => $contact->phone_e164 ?? '',
+                '{{last_name}}'     => $contact->last_name ?? '',
+                '{{company}}'       => $contact->company ?? '',
             ];
+
+            // Merge any custom attributes attached to contact (e.g. city, course, fee, roll_no)
+            if (!empty($contact->custom_attributes) && is_array($contact->custom_attributes)) {
+                foreach ($contact->custom_attributes as $key => $val) {
+                    $replacements["{{{$key}}}"] = is_scalar($val) ? (string)$val : '';
+                }
+            }
+
             return strtr($text, $replacements);
         };
 
@@ -244,7 +263,7 @@ class MeetingNotificationService
                 foreach ($comp['buttons'] ?? [] as $btn) {
                     $btnType = $btn['type'] ?? '';
                     if ($btnType === 'URL') {
-                        $url = $replaceVars($btn['url'] ?? $meetLink ?? 'https://learmy.solidrix.com');
+                        $url = $replaceVars($btn['url'] ?? $meetLink);
                         $buttons[] = ['type' => 'url', 'text' => $btn['text'] ?? 'Open Link', 'value' => $url];
                     } elseif ($btnType === 'PHONE_NUMBER') {
                         $phone = $btn['phone_number'] ?? '';
@@ -262,7 +281,7 @@ class MeetingNotificationService
         }
 
         // Add Meet Link button if not present in custom template buttons
-        if ($meetLink && empty(array_filter($buttons, fn($b) => $b['type'] === 'url'))) {
+        if ($meetLink && $meetLink !== 'TBD' && empty(array_filter($buttons, fn($b) => $b['type'] === 'url'))) {
             array_unshift($buttons, ['type' => 'url', 'text' => '🔗 Join Class Now', 'value' => $meetLink]);
         }
 
