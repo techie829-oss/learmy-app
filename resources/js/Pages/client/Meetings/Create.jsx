@@ -80,14 +80,15 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
     };
 
     const getTargetName = (target) => {
+        if (!target || !target.type) return 'Unknown Target';
         if (target.type === 'wa_group') {
             return `💬 WA Group: ${target.name || target.id}`;
         }
-        if (target.type.includes('ContactTag')) {
+        if (typeof target.type === 'string' && target.type.includes('ContactTag')) {
             const tag = tags.find(t => t.id === target.id);
             return `Batch: ${tag ? tag.name : 'Unknown'}`;
         }
-        if (target.type.includes('Segment')) {
+        if (typeof target.type === 'string' && target.type.includes('Segment')) {
             const seg = segments.find(s => s.id === target.id);
             return `Segment: ${seg ? seg.name : 'Unknown'}`;
         }
@@ -173,6 +174,16 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
 
                 <div className="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700/50 dark:bg-neutral-800">
                     <form onSubmit={submit} className="space-y-6 p-6">
+                        {Object.keys(errors).length > 0 && (
+                            <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-xs font-semibold text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+                                ⚠️ Class schedule karne ke liye kripya yeh errors fix karein:
+                                <ul className="mt-1.5 list-disc list-inside space-y-0.5 font-normal">
+                                    {Object.entries(errors).map(([key, msg]) => (
+                                        <li key={key}>{msg}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         {/* Class Title */}
                         <div>
                             <label htmlFor="title" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
