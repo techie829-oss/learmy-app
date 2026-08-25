@@ -62,7 +62,7 @@ async function getOrCreateSession(sessionId) {
         browser: Browsers.macOS('Chrome'), // Simulates standard macOS Google Chrome to avoid VPS IP security flags
         keepAliveIntervalMs: 30000, // Ping socket every 30s to prevent Malaysia VPS TCP drops
         markOnlineOnConnect: true,
-        syncFullHistory: true, // Enables full WhatsApp Web chat and contact history syncing on connect
+        syncFullHistory: false, // Prevents loading full multi-year chat archives; only recent & unread messages sync
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, logger)
@@ -191,12 +191,21 @@ async function getOrCreateSession(sessionId) {
             }
         }
 
-        // 2. Process history messages to sync past chat history into Learmy Inbox
+        // 2. Process ONLY recent (last 3 days) or unread history messages
         if (Array.isArray(messages)) {
+            const threeDaysAgo = Math.floor(Date.now() / 1000) - (3 * 86400);
+
             for (const msg of messages) {
                 if (!msg.message || msg.key.fromMe) continue;
                 let senderJid = msg.key.remoteJid || '';
                 if (senderJid === 'status@broadcast') continue;
+
+                const msgTimestamp = typeof msg.messageTimestamp === 'number'
+                    ? msg.messageTimestamp
+                    : (msg.messageTimestamp?.low || 0);
+
+                // Skip messages older than 3 days
+                if (msgTimestamp > 0 && msgTimestamp < threeDaysAgo) continue;
 
                 let realPhone = null;
                 if (senderJid.endsWith('@lid')) {
