@@ -2,7 +2,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import EmptyState from '@/Components/EmptyState';
 import { useState, useRef, useCallback } from 'react';
-import { UserPlus, Upload, Search, Tag, Trash2, Eye, Users, Table2, Download, CheckSquare, Square, X } from 'lucide-react';
+import { UserPlus, Upload, Search, Tag, Trash2, Eye, Users, Table2, Download, CheckSquare, Square, X, MessageSquare, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 function ContactAvatar({ contact, size = 8 }) {
@@ -29,26 +29,22 @@ function ContactAvatar({ contact, size = 8 }) {
     );
 }
 
-function ContactRow({ contact, selected, onToggle, onDelete }) {
+function ContactRow({ contact, selected, onToggle, onDelete, onEdit }) {
     const { t } = useTranslation();
     return (
         <tr className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/50 ${selected ? 'bg-brand-50 dark:bg-brand-900/10' : ''}`}>
             <td className="px-4 py-3">
                 <button type="button" onClick={() => onToggle(contact.uuid)} className="text-neutral-400 hover:text-brand-600 transition">
-                    {selected
-                        ? <CheckSquare className="h-4 w-4 text-brand-600" />
-                        : <Square className="h-4 w-4" />
-                    }
+                    {selected ? <CheckSquare className="h-4 w-4 text-brand-600" /> : <Square className="h-4 w-4" />}
                 </button>
             </td>
-            <td className="px-4 py-3 text-sm text-neutral-900 dark:text-neutral-100">
-                <div className="flex items-center gap-2.5">
-                    <ContactAvatar contact={contact} size={8} />
-                    <span>
-                        {contact.first_name || contact.last_name
-                            ? `${contact.first_name ?? ''} ${contact.last_name ?? ''}`.trim()
-                            : <span className="text-neutral-400">—</span>
-                        }
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                    <ContactAvatar contact={contact} />
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                        {(`${contact.first_name ?? ''} ${contact.last_name ?? ''}`).trim() || (
+                            <span className="text-neutral-400">{t('common.unnamed')}</span>
+                        )}
                     </span>
                 </div>
             </td>
@@ -72,10 +68,25 @@ function ContactRow({ contact, selected, onToggle, onDelete }) {
             </td>
             <td className="px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <Link href={route('client.contacts.show', contact.uuid)} className="text-neutral-400 hover:text-brand-600 transition">
+                    <a
+                        href={`/app/inbox?contact_id=${contact.id}`}
+                        title="Chat on WhatsApp"
+                        className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition"
+                    >
+                        <MessageSquare className="h-4 w-4" />
+                    </a>
+                    <button
+                        type="button"
+                        onClick={() => onEdit(contact)}
+                        title="Edit Contact"
+                        className="p-1 rounded-lg text-neutral-400 hover:text-brand-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </button>
+                    <Link href={route('client.contacts.show', contact.uuid)} className="p-1 rounded-lg text-neutral-400 hover:text-brand-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition">
                         <Eye className="h-4 w-4" />
                     </Link>
-                    <button type="button" onClick={() => onDelete(contact.uuid)} className="text-neutral-400 hover:text-red-500 transition">
+                    <button type="button" onClick={() => onDelete(contact.uuid)} className="p-1 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition">
                         <Trash2 className="h-4 w-4" />
                     </button>
                 </div>

@@ -192,6 +192,44 @@ export default function NewConversationModal({ onClose }) {
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto">
+                            {/* Quick Add Contact Option if searching phone/text */}
+                            {query.trim().length >= 3 && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setLoadingContacts(true);
+                                        try {
+                                            const res = await axios.post(route('client.contacts.store'), {
+                                                phone_e164: query.trim(),
+                                                first_name: query.trim(),
+                                                opt_in_whatsapp: true,
+                                            });
+                                            selectContact(res.data?.contact ?? res.data);
+                                        } catch (err) {
+                                            // If contact already exists or fail, search directly
+                                            const searchRes = await axios.get(route('client.inbox.contacts.search'), { params: { q: query } });
+                                            if (searchRes.data?.length > 0) {
+                                                selectContact(searchRes.data[0]);
+                                            } else {
+                                                alert(err.response?.data?.message || 'Could not create contact. Please enter valid phone number.');
+                                            }
+                                        } finally {
+                                            setLoadingContacts(false);
+                                        }
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60 transition text-left border-b border-emerald-100 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 font-medium text-xs"
+                                >
+                                    <div className="h-8 w-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                                        +
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm">Start Direct Chat with "{query}"</p>
+                                        <p className="text-[11px] opacity-80">Auto-create contact &amp; open WhatsApp chat</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 shrink-0" />
+                                </button>
+                            )}
+
                             {!loadingContacts && contacts.length === 0 && (
                                 <div className="flex flex-col items-center justify-center py-12 text-neutral-400">
                                     <User className="h-8 w-8 mb-2 opacity-40" />
