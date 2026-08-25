@@ -39,6 +39,7 @@ class MeetingController extends Controller
 
         // WhatsApp templates for notification selector
         $waTemplates = $this->getWhatsappTemplates($workspaceId);
+        $waGroups    = $this->fetchWhatsappGroups($workspaceId);
 
         // Check if QR or Meta WhatsApp is connected
         $whatsappConnected = ChannelAccount::where('workspace_id', $workspaceId)
@@ -49,6 +50,7 @@ class MeetingController extends Controller
         return Inertia::render('client/Meetings/Create', [
             'tags'               => $tags,
             'segments'           => $segments,
+            'waGroups'           => $waGroups,
             'workspace_id'       => $workspaceId,
             'waTemplates'        => $waTemplates,
             'whatsappConnected'  => $whatsappConnected,
@@ -127,13 +129,28 @@ class MeetingController extends Controller
                 'reminder_settings'          => $validated['reminder_settings'] ?? null,
             ]);
 
-            // Save Smart Mapping Targets
+            // Process and Save Smart Mapping Targets (auto-sync WA Groups to ContactTag if selected)
             foreach ($validated['targets'] ?? [] as $target) {
-                MeetingTarget::create([
-                    'meeting_id'  => $meeting->id,
-                    'target_type' => $target['type'],
-                    'target_id'   => $target['id'],
-                ]);
+                $targetType = $target['type'] ?? '';
+                $targetId   = $target['id'] ?? null;
+
+                if ($targetType === 'wa_group') {
+                    $groupName = $target['name'] ?? 'WhatsApp Group';
+                    $tagId     = $this->syncWhatsappGroupAsTag($workspaceId, (string)$targetId, (string)$groupName);
+                    if ($tagId) {
+                        MeetingTarget::create([
+                            'meeting_id'  => $meeting->id,
+                            'target_type' => ContactTag::class,
+                            'target_id'   => $tagId,
+                        ]);
+                    }
+                } else {
+                    MeetingTarget::create([
+                        'meeting_id'  => $meeting->id,
+                        'target_type' => $targetType,
+                        'target_id'   => (int) $targetId,
+                    ]);
+                }
             }
 
             // Trigger Instant Notification for 'on_create' trigger
@@ -161,6 +178,7 @@ class MeetingController extends Controller
         $tags        = ContactTag::where('workspace_id', $workspaceId)->get(['id', 'name']);
         $segments    = Segment::where('workspace_id', $workspaceId)->get(['id', 'name']);
         $waTemplates = $this->getWhatsappTemplates($workspaceId);
+        $waGroups    = $this->fetchWhatsappGroups($workspaceId);
 
         $whatsappConnected = ChannelAccount::where('workspace_id', $workspaceId)
             ->where('channel', 'whatsapp')
@@ -171,6 +189,7 @@ class MeetingController extends Controller
             'meeting'           => $meeting->load('targets'),
             'tags'              => $tags,
             'segments'          => $segments,
+            'waGroups'          => $waGroups,
             'workspace_id'      => $workspaceId,
             'waTemplates'       => $waTemplates,
             'whatsappConnected' => $whatsappConnected,
@@ -199,10 +218,10 @@ class MeetingController extends Controller
             'reminder_settings'          => 'nullable|array',
             'targets'                    => 'nullable|array',
             'targets.*.type'             => 'required_with:targets|string',
-            'targets.*.id'               => 'required_with:targets|integer',
+            'targets.*.id'               => 'nullable',
         ]);
 
-        return DB::transaction(function () use ($meeting, $validated) {
+        return DB::transaction(function () use ($meeting, $validated, $workspaceId) {
             $meeting->update([
                 'title'                      => $validated['title'],
                 'description'                => $validated['description'] ?? null,
@@ -218,11 +237,26 @@ class MeetingController extends Controller
             // Replace targets
             $meeting->targets()->delete();
             foreach ($validated['targets'] ?? [] as $target) {
-                MeetingTarget::create([
-                    'meeting_id'  => $meeting->id,
-                    'target_type' => $target['type'],
-                    'target_id'   => $target['id'],
-                ]);
+                $targetType = $target['type'] ?? '';
+                $targetId   = $target['id'] ?? null;
+
+                if ($targetType === 'wa_group') {
+                    $groupName = $target['name'] ?? 'WhatsApp Group';
+                    $tagId     = $this->syncWhatsappGroupAsTag($workspaceId, (string)$targetId, (string)$groupName);
+                    if ($tagId) {
+                        MeetingTarget::create([
+                            'meeting_id'  => $meeting->id,
+                            'target_type' => ContactTag::class,
+                            'target_id'   => $tagId,
+                        ]);
+                    }
+                } else {
+                    MeetingTarget::create([
+                        'meeting_id'  => $meeting->id,
+                        'target_type' => $targetType,
+                        'target_id'   => (int) $targetId,
+                    ]);
+                }
             }
 
             return redirect()->route('client.meetings.index')->with('success', 'Meeting updated successfully.');
@@ -238,6 +272,109 @@ class MeetingController extends Controller
         $meeting->delete();
 
         return redirect()->route('client.meetings.index')->with('success', 'Meeting deleted.');
+    }
+
+    /**
+     * Fetch WhatsApp groups from connected QR Baileys session.
+     */
+    private function fetchWhatsappGroups(int $workspaceId): array
+    {
+        $qrAccount = ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('provider', 'qr_baileys')
+            ->where('status', 'active')
+            ->first();
+
+        if (! $qrAccount) {
+            return [];
+        }
+
+        $sessionId = $qrAccount->meta_json['session_id'] ?? "workspace_{$workspaceId}_qr";
+
+        try {
+            $qrUrl = config('services.whatsapp_qr.url', 'http://127.0.0.1:3001');
+            $response = \Illuminate\Support\Facades\Http::timeout(5)->get("{$qrUrl}/api/groups", [
+                'sessionId' => $sessionId,
+            ]);
+
+            if ($response->successful() && $response->json('success')) {
+                return $response->json('groups', []);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[MeetingController] Failed to fetch WA groups: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    /**
+     * Sync WhatsApp Group participants as Contacts with a ContactTag.
+     */
+    private function syncWhatsappGroupAsTag(int $workspaceId, string $groupId, string $groupName): ?int
+    {
+        $qrAccount = ChannelAccount::where('workspace_id', $workspaceId)
+            ->where('provider', 'qr_baileys')
+            ->where('status', 'active')
+            ->first();
+
+        if (! $qrAccount) {
+            return null;
+        }
+
+        $sessionId = $qrAccount->meta_json['session_id'] ?? "workspace_{$workspaceId}_qr";
+        $qrUrl     = config('services.whatsapp_qr.url', 'http://127.0.0.1:3001');
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->get(
+                "{$qrUrl}/api/groups/" . urlencode($groupId) . '/participants',
+                ['sessionId' => $sessionId]
+            );
+
+            if (! $response->successful()) {
+                \Illuminate\Support\Facades\Log::warning('[MeetingController] Failed to fetch participants for group ' . $groupId);
+                return null;
+            }
+
+            $participants = $response->json('group.participants', []);
+            if (empty($participants)) {
+                return null;
+            }
+
+            $tagName = 'Group: ' . trim($groupName);
+            $tag     = ContactTag::firstOrCreate(
+                ['workspace_id' => $workspaceId, 'name' => $tagName],
+                ['color' => '#10B981']
+            );
+
+            foreach ($participants as $p) {
+                $phone = $p['phone'] ?? null;
+                if (! $phone) {
+                    continue;
+                }
+
+                if (! str_starts_with($phone, '+')) {
+                    $phone = '+' . $phone;
+                }
+
+                $contact = \App\Modules\Shared\Models\Contact::firstOrCreate(
+                    ['workspace_id' => $workspaceId, 'phone_e164' => $phone],
+                    [
+                        'first_name'      => 'WA Contact',
+                        'last_name'       => ltrim($phone, '+'),
+                        'opt_in_whatsapp' => true,
+                        'source'          => 'whatsapp_group',
+                    ]
+                );
+
+                if (! $contact->tags()->where('contact_tags.id', $tag->id)->exists()) {
+                    $contact->tags()->attach($tag->id);
+                }
+            }
+
+            return $tag->id;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('[MeetingController] Exception syncing group as tag: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**

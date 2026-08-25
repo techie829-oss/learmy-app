@@ -3,7 +3,7 @@ import { Head, Link, useForm, router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink, Clock, Sun, Zap, PlayCircle } from 'lucide-react';
 
-export default function Create({ tags = [], segments = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
+export default function Create({ tags = [], segments = [], waGroups = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
     const isEdit = !!meeting;
 
     const initialTargets = isEdit
@@ -47,15 +47,29 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
     const handleTargetChange = (e) => {
         const value = e.target.value;
         if (!value) return;
-        const [type, id] = value.split(':');
-        const parsedId = parseInt(id);
-        if (selectedTargets.some(t => t.type === type && t.id === parsedId)) {
-            e.target.value = '';
-            return;
+        const parts = value.split(':');
+        const type  = parts[0];
+
+        if (type === 'wa_group') {
+            const groupId   = parts[1];
+            const groupName = parts.slice(2).join(':');
+            if (selectedTargets.some(t => t.type === 'wa_group' && t.id === groupId)) {
+                e.target.value = '';
+                return;
+            }
+            const newTargets = [...selectedTargets, { type: 'wa_group', id: groupId, name: groupName }];
+            setSelectedTargets(newTargets);
+            setData('targets', newTargets);
+        } else {
+            const parsedId = parseInt(parts[1]);
+            if (selectedTargets.some(t => t.type === type && t.id === parsedId)) {
+                e.target.value = '';
+                return;
+            }
+            const newTargets = [...selectedTargets, { type, id: parsedId }];
+            setSelectedTargets(newTargets);
+            setData('targets', newTargets);
         }
-        const newTargets = [...selectedTargets, { type, id: parsedId }];
-        setSelectedTargets(newTargets);
-        setData('targets', newTargets);
         e.target.value = '';
     };
 
@@ -66,6 +80,9 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
     };
 
     const getTargetName = (target) => {
+        if (target.type === 'wa_group') {
+            return `💬 WA Group: ${target.name || target.id}`;
+        }
         if (target.type.includes('ContactTag')) {
             const tag = tags.find(t => t.id === target.id);
             return `Batch: ${tag ? tag.name : 'Unknown'}`;
@@ -242,7 +259,16 @@ export default function Create({ tags = [], segments = [], workspace_id, meeting
                                 defaultValue=""
                                 className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
                             >
-                                <option value="">Select a Batch or Segment to add...</option>
+                                <option value="">Select a Batch, Group or Segment to add...</option>
+                                {waGroups.length > 0 && (
+                                    <optgroup label="💬 WhatsApp Groups (Live QR)">
+                                        {waGroups.map(group => (
+                                            <option key={`group-${group.id}`} value={`wa_group:${group.id}:${group.name}`}>
+                                                👥 {group.name} ({group.participantCount || 0} members)
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                                 <optgroup label="Batches (Tags)">
                                     {tags.map(tag => (
                                         <option key={`tag-${tag.id}`} value={`App\\Modules\\Shared\\Models\\ContactTag:${tag.id}`}>
