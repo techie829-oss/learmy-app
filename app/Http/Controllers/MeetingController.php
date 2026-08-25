@@ -342,10 +342,10 @@ class MeetingController extends Controller
             $tagName = 'Group: ' . trim($groupName);
             $tag     = ContactTag::firstOrCreate(
                 ['workspace_id' => $workspaceId, 'name' => $tagName],
-                ['color' => '#10B981', 'description' => $groupId]
+                ['color' => '#10B981', 'wa_group_jid' => $groupId]
             );
-            if ($groupId && ($tag->description !== $groupId)) {
-                $tag->update(['description' => $groupId]);
+            if ($groupId && ($tag->wa_group_jid !== $groupId)) {
+                $tag->update(['wa_group_jid' => $groupId]);
             }
 
             foreach ($participants as $p) {

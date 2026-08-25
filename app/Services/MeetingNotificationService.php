@@ -109,8 +109,8 @@ class MeetingNotificationService
                     $this->sendToGroupViaQr($qrAccount, $targetId, $meeting, $trigger, $templateName);
                 } else {
                     $entity = $target->target;
-                    if ($entity instanceof ContactTag && !empty($entity->description) && str_ends_with($entity->description, '@g.us')) {
-                        $this->sendToGroupViaQr($qrAccount, $entity->description, $meeting, $trigger, $templateName);
+                    if ($entity instanceof ContactTag && !empty($entity->wa_group_jid)) {
+                        $this->sendToGroupViaQr($qrAccount, $entity->wa_group_jid, $meeting, $trigger, $templateName);
                     }
                 }
             }
