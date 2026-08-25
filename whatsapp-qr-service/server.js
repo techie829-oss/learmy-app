@@ -127,22 +127,33 @@ async function getOrCreateSession(sessionId) {
 
     sock.ev.on('contacts.upsert', (contacts) => {
         for (const c of contacts) {
-            if (c.id && c.lid && c.id.endsWith('@s.whatsapp.net')) {
+            // c.id = phone JID (e.g. 917007420572@s.whatsapp.net)
+            // c.lid = LID JID (e.g. 32495856832586@lid)
+            if (c.id && c.id.endsWith('@s.whatsapp.net')) {
                 const phone = c.id.split('@')[0];
-                const cleanLid = c.lid.split('@')[0];
-                lidMap.set(c.lid, phone);
-                lidMap.set(cleanLid, phone);
+                if (c.lid) {
+                    const cleanLid = c.lid.split('@')[0];
+                    lidMap.set(c.lid, phone);
+                    lidMap.set(cleanLid, phone);
+                    console.log(`[LID Map] ${c.lid} → +${phone}`);
+                }
+                // Also map phone to phone (normalise)
+                lidMap.set(c.id, phone);
             }
         }
     });
 
     sock.ev.on('contacts.update', (updates) => {
         for (const c of updates) {
-            if (c.id && c.lid && c.id.endsWith('@s.whatsapp.net')) {
+            if (c.id && c.id.endsWith('@s.whatsapp.net')) {
                 const phone = c.id.split('@')[0];
-                const cleanLid = c.lid.split('@')[0];
-                lidMap.set(c.lid, phone);
-                lidMap.set(cleanLid, phone);
+                if (c.lid) {
+                    const cleanLid = c.lid.split('@')[0];
+                    lidMap.set(c.lid, phone);
+                    lidMap.set(cleanLid, phone);
+                    console.log(`[LID Map Updated] ${c.lid} → +${phone}`);
+                }
+                lidMap.set(c.id, phone);
             }
         }
     });
@@ -156,25 +167,43 @@ async function getOrCreateSession(sessionId) {
 
             let realPhone = null;
 
-            // Handle WhatsApp LID (Linked Identity ID e.g. 32495856832586@lid)
+            // Attempt: resolve LID using contacts store or lidMap
             if (senderJid.endsWith('@lid')) {
                 const rawLid = senderJid.split('@')[0];
-                if (lidMap.has(senderJid)) {
-                    senderJid = `${lidMap.get(senderJid)}@s.whatsapp.net`;
-                } else if (lidMap.has(rawLid)) {
-                    senderJid = `${lidMap.get(rawLid)}@s.whatsapp.net`;
-                } else if (msg.key.participant && msg.key.participant.endsWith('@s.whatsapp.net')) {
-                    senderJid = msg.key.participant;
-                } else if (msg.participant && msg.participant.endsWith('@s.whatsapp.net')) {
-                    senderJid = msg.participant;
-                } else if (msg.key.remoteJidAlt && msg.key.remoteJidAlt.endsWith('@s.whatsapp.net')) {
-                    senderJid = msg.key.remoteJidAlt;
-                }
-            }
 
-            if (senderJid.endsWith('@s.whatsapp.net')) {
-                realPhone = senderJid.split('@')[0];
+                // 1. Check our lidMap
+                if (lidMap.has(senderJid)) {
+                    realPhone = lidMap.get(senderJid);
+                } else if (lidMap.has(rawLid)) {
+                    realPhone = lidMap.get(rawLid);
+                } else {
+                    // 2. Try Baileys contact store
+                    try {
+                        const storeContacts = sock.store?.contacts || {};
+                        const matched = Object.entries(storeContacts).find(([jid]) =>
+                            jid.endsWith('@s.whatsapp.net') && storeContacts[jid]?.lid === senderJid
+                        );
+                        if (matched) {
+                            realPhone = matched[0].split('@')[0];
+                        }
+                    } catch {}
+
+                    // 3. Fallback to participant / other fields
+                    if (!realPhone) {
+                        const alt = msg.key.participant || msg.participant || msg.key.remoteJidAlt || '';
+                        if (alt.endsWith('@s.whatsapp.net')) {
+                            realPhone = alt.split('@')[0];
+                        }
+                    }
+
+                    // 4. Last resort: use LID number as phone (may still be wrong)
+                    if (!realPhone) {
+                        realPhone = rawLid;
+                        console.warn(`[LID UNRESOLVED] ${senderJid} — using raw LID as fallback. Full msg key:`, JSON.stringify(msg.key));
+                    }
+                }
             } else {
+                // Regular JID — strip @s.whatsapp.net or similar
                 realPhone = senderJid.split('@')[0];
             }
 
