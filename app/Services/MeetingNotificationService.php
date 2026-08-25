@@ -107,6 +107,11 @@ class MeetingNotificationService
                 $targetId = (string) $target->target_id;
                 if ($target->target_type === 'wa_group' || str_ends_with($targetId, '@g.us')) {
                     $this->sendToGroupViaQr($qrAccount, $targetId, $meeting, $trigger, $templateName);
+                } else {
+                    $entity = $target->target;
+                    if ($entity instanceof ContactTag && !empty($entity->description) && str_ends_with($entity->description, '@g.us')) {
+                        $this->sendToGroupViaQr($qrAccount, $entity->description, $meeting, $trigger, $templateName);
+                    }
                 }
             }
         }

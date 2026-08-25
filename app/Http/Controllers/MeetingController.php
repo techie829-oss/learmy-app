@@ -342,8 +342,11 @@ class MeetingController extends Controller
             $tagName = 'Group: ' . trim($groupName);
             $tag     = ContactTag::firstOrCreate(
                 ['workspace_id' => $workspaceId, 'name' => $tagName],
-                ['color' => '#10B981']
+                ['color' => '#10B981', 'description' => $groupId]
             );
+            if ($groupId && ($tag->description !== $groupId)) {
+                $tag->update(['description' => $groupId]);
+            }
 
             foreach ($participants as $p) {
                 $phone = $p['phone'] ?? null;
