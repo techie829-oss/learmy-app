@@ -169,7 +169,7 @@ class MeetingNotificationService
             if ($dbTemplate && !empty($dbTemplate->components)) {
                 $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $contact, $meeting);
             } else {
-                $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink);
+                $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink, $qrAccount->workspace_id);
             }
 
             $payload = [
@@ -222,7 +222,7 @@ class MeetingNotificationService
                 $dummyContact = new Contact(['first_name' => 'Students', 'full_name' => 'Students']);
                 $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting);
             } else {
-                $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink);
+                $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink, $qrAccount->workspace_id);
             }
 
             $payload = [
@@ -257,45 +257,81 @@ class MeetingNotificationService
     }
 
     /**
+    /**
+     * Dynamically resolve Organization / Company Name for a workspace from DB settings or Client model.
+     */
+    private function getOrganizationName(int $workspaceId): string
+    {
+        try {
+            $workspace = \App\Models\Workspace::with('client')->find($workspaceId);
+            if ($workspace) {
+                if ($workspace->client_id) {
+                    $settingName = \App\Models\ClientSetting::get($workspace->client_id, 'organization_name')
+                                ?? \App\Models\ClientSetting::get($workspace->client_id, 'company_name');
+                    if (!empty($settingName)) {
+                        return (string) $settingName;
+                    }
+                    if ($workspace->client && !empty($workspace->client->name)) {
+                        return (string) $workspace->client->name;
+                    }
+                }
+                if (!empty($workspace->name)) {
+                    return (string) $workspace->name;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[MeetingNotification] Error resolving organization name', ['error' => $e->getMessage()]);
+        }
+
+        return config('app.name', 'Learmy');
+    }
+
+    /**
      * Render a custom WhatsappTemplate from DB by replacing dynamic variables:
      * - {{1}} / {{first_name}} / {{name}} -> Student Name
      * - {{2}} / {{title}} / {{class_title}} -> Class Title
      * - {{3}} / {{start_time}} / {{date_time}} -> Class Time
      * - {{4}} / {{meet_link}} / {{link}} -> Google Meet URL
      * - {{5}} / {{description}} -> Class Description
+     * - {{organization}} / {{organization_name}} / {{company}} / {{brand}} -> Organization Name from DB
      * - Any contact field or custom attribute (e.g. {{email}}, {{phone}}, {{city}}, {{course}})
      */
     private function renderCustomDbTemplate(array $components, Contact $contact, Meeting $meeting): array
     {
+        $orgName     = $this->getOrganizationName($meeting->workspace_id);
         $firstName   = $contact->first_name ?? $contact->full_name ?? 'Student';
         $title       = $meeting->title;
         $dateTime    = $meeting->start_time->format('d M Y, h:i A');
         $meetLink    = $meeting->meet_link ?? 'TBD';
         $description = $meeting->description ?? '';
 
-        $replaceVars = function (string $text) use ($contact, $firstName, $title, $dateTime, $meetLink, $description): string {
+        $replaceVars = function (string $text) use ($contact, $firstName, $title, $dateTime, $meetLink, $description, $orgName): string {
             $replacements = [
-                '{{1}} font'        => $firstName,
-                '{{1}}'             => $firstName,
-                '{{first_name}}'    => $firstName,
-                '{{name}}'          => $firstName,
-                '{{student_name}}'  => $firstName,
-                '{{2}}'             => $title,
-                '{{title}}'         => $title,
-                '{{class_title}}'   => $title,
-                '{{3}}'             => $dateTime,
-                '{{start_time}}'    => $dateTime,
-                '{{date_time}}'     => $dateTime,
-                '{{time}}'          => $dateTime,
-                '{{4}}'             => $meetLink,
-                '{{meet_link}}'     => $meetLink,
-                '{{link}}'          => $meetLink,
-                '{{5}}'             => $description,
-                '{{description}}'   => $description,
-                '{{email}}'         => $contact->email ?? '',
-                '{{phone}}'         => $contact->phone_e164 ?? '',
-                '{{last_name}}'     => $contact->last_name ?? '',
-                '{{company}}'       => $contact->company ?? '',
+                '{{1}} font'             => $firstName,
+                '{{1}}'                  => $firstName,
+                '{{first_name}}'         => $firstName,
+                '{{name}}'               => $firstName,
+                '{{student_name}}'       => $firstName,
+                '{{2}}'                  => $title,
+                '{{title}}'              => $title,
+                '{{class_title}}'        => $title,
+                '{{3}}'                  => $dateTime,
+                '{{start_time}}'         => $dateTime,
+                '{{date_time}}'          => $dateTime,
+                '{{time}}'               => $dateTime,
+                '{{4}}'                  => $meetLink,
+                '{{meet_link}}'          => $meetLink,
+                '{{link}}'               => $meetLink,
+                '{{5}}'                  => $description,
+                '{{description}}'        => $description,
+                '{{organization}}'       => $orgName,
+                '{{organization_name}}'  => $orgName,
+                '{{company}}'            => $orgName,
+                '{{brand}}'              => $orgName,
+                '{{app_name}}'           => $orgName,
+                '{{email}}'              => $contact->email ?? '',
+                '{{phone}}'              => $contact->phone_e164 ?? '',
+                '{{last_name}}'          => $contact->last_name ?? '',
             ];
 
             // Merge any custom attributes attached to contact (e.g. city, course, fee, roll_no)
@@ -310,7 +346,7 @@ class MeetingNotificationService
 
         $header  = null;
         $body    = '';
-        $footer  = 'Learmy Education Platform | learmy.solidrix.com';
+        $footer  = "{$orgName} Education Platform";
         $buttons = [];
 
         foreach ($components as $comp) {
@@ -326,7 +362,7 @@ class MeetingNotificationService
             } elseif ($type === 'BODY') {
                 $body = $replaceVars($comp['text'] ?? '');
             } elseif ($type === 'FOOTER') {
-                $footer = $comp['text'] ?? $footer;
+                $footer = $replaceVars($comp['text'] ?? $footer);
             } elseif ($type === 'BUTTONS') {
                 foreach ($comp['buttons'] ?? [] as $btn) {
                     $btnType = $btn['type'] ?? '';
@@ -345,7 +381,7 @@ class MeetingNotificationService
 
         // Default header if none defined in DB template
         if (!$header) {
-            $header = ['type' => 'text', 'text' => "📅 Class Reminder — Learmy"];
+            $header = ['type' => 'text', 'text' => "📅 Class Reminder — {$orgName}"];
         }
 
         // Add Meet Link button if not present in custom template buttons
@@ -364,15 +400,16 @@ class MeetingNotificationService
     /**
      * Built-in dynamic fallback templates for each trigger timing.
      */
-    private function buildDefaultQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink): array
+    private function buildDefaultQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink, int $workspaceId = 0): array
     {
-        $footer = 'Learmy Education Platform | learmy.solidrix.com';
+        $orgName = $workspaceId ? $this->getOrganizationName($workspaceId) : config('app.name', 'Learmy');
+        $footer  = "{$orgName} Education Platform";
 
         switch ($trigger) {
             case 'morning':
-                $header = ['type' => 'text', 'text' => "🌅 Today's Class Reminder — Learmy"];
+                $header = ['type' => 'text', 'text' => "🌅 Today's Class Reminder — {$orgName}"];
                 $body   = "Namaste *{$firstName}* ji! ☀️\n\n"
-                        . "Aaj aapki *Learmy* class scheduled hai:\n\n"
+                        . "Aaj aapki *{$orgName}* class scheduled hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
                         . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')
@@ -385,9 +422,9 @@ class MeetingNotificationService
                 break;
 
             case 'before_15m':
-                $header = ['type' => 'text', 'text' => "⏰ Class Starting in 15 Minutes!"];
+                $header = ['type' => 'text', 'text' => "⏰ Class Starting in 15 Minutes — {$orgName}"];
                 $body   = "Namaste *{$firstName}* ji! ⏳\n\n"
-                        . "Aapki class bas *15 minute* mein shuru hone wali hai:\n\n"
+                        . "Aapki *{$orgName}* class bas *15 minute* mein shuru hone wali hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
                         . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')
@@ -400,9 +437,9 @@ class MeetingNotificationService
                 break;
 
             case 'on_start':
-                $header = ['type' => 'text', 'text' => "🔴 Class is LIVE Now!"];
+                $header = ['type' => 'text', 'text' => "🔴 Class is LIVE Now — {$orgName}"];
                 $body   = "Namaste *{$firstName}* ji! 🔴 LIVE\n\n"
-                        . "Aapki class *LIVE* shuru ho chuki hai!\n\n"
+                        . "Aapki *{$orgName}* class *LIVE* shuru ho chuki hai!\n\n"
                         . "📚 *{$title}*\n"
                         . ($meetLink ? "🔗 *Join Immediately:* {$meetLink}\n" : '')
                         . "\nDelay mat karein — abhi join karein! 🚀";
@@ -415,9 +452,9 @@ class MeetingNotificationService
 
             case 'on_create':
             default:
-                $header = ['type' => 'text', 'text' => "📅 New Class Scheduled — Learmy"];
+                $header = ['type' => 'text', 'text' => "📅 New Class Scheduled — {$orgName}"];
                 $body   = "Namaste *{$firstName}* ji! 👋\n\n"
-                        . "Aapki new class schedule ho gayi hai:\n\n"
+                        . "Aapki new *{$orgName}* class schedule ho gayi hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
                         . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')

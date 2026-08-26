@@ -51,6 +51,29 @@ class CampaignPersonalizer
             }, $template);
         }
 
+        // {{organization}}, {{organization_name}}, {{company}}, {{brand}}, {{app_name}}
+        if (preg_match('/\{\{\s*(organization|organization_name|company|brand|app_name)\s*\}\}/i', $template)) {
+            $orgName = null;
+            if (!empty($contact->workspace_id)) {
+                try {
+                    $ws = \App\Models\Workspace::with('client')->find($contact->workspace_id);
+                    if ($ws && $ws->client_id) {
+                        $orgName = \App\Models\ClientSetting::get($ws->client_id, 'organization_name')
+                                ?? \App\Models\ClientSetting::get($ws->client_id, 'company_name')
+                                ?? $ws->client?->name;
+                    }
+                    if (!$orgName && $ws) {
+                        $orgName = $ws->name;
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore
+                }
+            }
+            $orgName = $orgName ?: config('app.name', 'Learmy');
+
+            $template = preg_replace('/\{\{\s*(organization|organization_name|company|brand|app_name)\s*\}\}/i', $orgName, $template);
+        }
+
         return $template;
     }
 
