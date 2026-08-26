@@ -1,8 +1,8 @@
 import ClientLayout from '@/Layouts/ClientLayout';
 import { Button } from '@/Components/ui';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
-import { Settings as SettingsIcon, Bell, Download } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { browserTz } from '@/Utils/datetime';
 import TimezonePicker from '@/Components/TimezonePicker';
 
@@ -192,15 +192,6 @@ export default function ClientSettingsIndex({
                     )}
                 </form>
 
-                <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
-                    <Link
-                        href={route('client.settings.data-export')}
-                        className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
-                    >
-                        <Download className="h-4 w-4" />
-                        {t('settings.export_data_link')} →
-                    </Link>
-                </div>
             </div>
         </ClientLayout>
     );
