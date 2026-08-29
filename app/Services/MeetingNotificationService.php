@@ -50,13 +50,9 @@ class MeetingNotificationService
         }
 
         $contacts = $this->resolveContacts($meeting);
-
-        if ($contacts->isEmpty()) {
-            return ['whatsapp_connected' => true, 'contacts_count' => 0, 'sent_count' => 0];
-        }
-
         $sentCount = 0;
 
+        // ── Individual contacts (Tags, Segments, direct) ─────────────────────
         foreach ($contacts as $contact) {
             if (empty($contact->phone_e164)) {
                 continue;
@@ -101,13 +97,18 @@ class MeetingNotificationService
             }
         }
 
-        // Direct broadcast message into targeted WhatsApp Group chat(s)
+        // ── Direct broadcast into WhatsApp Group chats ────────────────────────
+        // This runs REGARDLESS of whether individual contacts exist, so groups
+        // always receive the notification even when targets are wa_group only.
         if ($qrAccount) {
+            $meeting->load('targets.target');
             foreach ($meeting->targets as $target) {
                 $targetId = (string) $target->target_id;
                 if ($target->target_type === 'wa_group' || str_ends_with($targetId, '@g.us')) {
+                    // Target stored directly as wa_group JID
                     $this->sendToGroupViaQr($qrAccount, $targetId, $meeting, $trigger, $templateName);
                 } else {
+                    // Tag/Segment target — check if it has a linked WA group JID
                     $entity = $target->target;
                     if ($entity instanceof ContactTag && !empty($entity->wa_group_jid)) {
                         $this->sendToGroupViaQr($qrAccount, $entity->wa_group_jid, $meeting, $trigger, $templateName);

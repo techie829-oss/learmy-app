@@ -2,7 +2,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import EmptyState from '@/Components/EmptyState';
 import { useState, useRef, useCallback } from 'react';
-import { UserPlus, Upload, Search, Tag, Trash2, Eye, Users, Table2, Download, CheckSquare, Square, X, MessageSquare, Pencil } from 'lucide-react';
+import { UserPlus, Upload, Search, Tag, Trash2, Eye, Users, Table2, Download, CheckSquare, Square, X, MessageSquare, Pencil, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 function ContactAvatar({ contact, size = 8 }) {
@@ -100,14 +100,53 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
     const flash = props.flash ?? {};
     const [search, setSearch] = useState(filters.search ?? '');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [editContact, setEditContact] = useState(null);
     const [selected, setSelected] = useState(new Set());
     const fileInput = useRef();
 
+    // ── Add contact form ────────────────────────────────────────────────
     const { data, setData, post, processing, reset } = useForm({
         first_name: '', last_name: '', phone_e164: '', email: '',
         opt_in_whatsapp: true, opt_in_sms: true, opt_in_email: true,
         segment_ids: [],
     });
+
+    // ── Edit contact form ────────────────────────────────────────────────
+    const { data: editData, setData: setEditData, put, processing: editProcessing, reset: resetEdit, errors: editErrors } = useForm({
+        first_name: '',
+        last_name: '',
+        phone_e164: '',
+        email: '',
+        opt_in_whatsapp: true,
+        opt_in_sms: true,
+        opt_in_email: true,
+    });
+
+    const openEditModal = (contact) => {
+        setEditContact(contact);
+        setEditData({
+            first_name: contact.first_name ?? '',
+            last_name: contact.last_name ?? '',
+            phone_e164: contact.phone_e164 ?? '',
+            email: contact.email ?? '',
+            opt_in_whatsapp: contact.opt_in_whatsapp ?? true,
+            opt_in_sms: contact.opt_in_sms ?? true,
+            opt_in_email: contact.opt_in_email ?? true,
+        });
+    };
+
+    const closeEditModal = () => {
+        setEditContact(null);
+        resetEdit();
+    };
+
+    const submitEdit = (e) => {
+        e.preventDefault();
+        put(route('client.contacts.update', editContact.uuid), {
+            preserveScroll: true,
+            onSuccess: () => closeEditModal(),
+        });
+    };
 
     const allUuids = contacts.data.map(c => c.uuid);
     const allSelected = allUuids.length > 0 && allUuids.every(id => selected.has(id));
@@ -287,6 +326,7 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
                                     selected={selected.has(c.uuid)}
                                     onToggle={toggleOne}
                                     onDelete={handleDelete}
+                                    onEdit={openEditModal}
                                 />
                             ))}
                             {contacts.data.length === 0 && (
@@ -316,7 +356,7 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
                 )}
             </div>
 
-            {/* Add Contact Modal */}
+            {/* ── Add Contact Modal ─────────────────────────────────────────── */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl space-y-4">
@@ -373,6 +413,116 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
                                 </button>
                                 <button type="button" onClick={() => setShowAddModal(false)} className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition">
                                     {t('common.cancel')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Inline Edit Contact Modal ─────────────────────────────────── */}
+            {editContact && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800">
+                            <div className="flex items-center gap-3">
+                                <ContactAvatar contact={editContact} size={9} />
+                                <div>
+                                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Edit Contact</h3>
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{editContact.phone_e164 || editContact.email || 'No contact info'}</p>
+                                </div>
+                            </div>
+                            <button type="button" onClick={closeEditModal} className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <form onSubmit={submitEdit} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">First Name</label>
+                                    <input
+                                        type="text"
+                                        value={editData.first_name}
+                                        onChange={e => setEditData('first_name', e.target.value)}
+                                        className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                    />
+                                    {editErrors.first_name && <p className="mt-1 text-xs text-red-500">{editErrors.first_name}</p>}
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Last Name</label>
+                                    <input
+                                        type="text"
+                                        value={editData.last_name}
+                                        onChange={e => setEditData('last_name', e.target.value)}
+                                        className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Phone (E.164 format)</label>
+                                <input
+                                    type="text"
+                                    value={editData.phone_e164}
+                                    onChange={e => setEditData('phone_e164', e.target.value)}
+                                    placeholder="+919876543210"
+                                    className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                {editErrors.phone_e164 && <p className="mt-1 text-xs text-red-500">{editErrors.phone_e164}</p>}
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Email</label>
+                                <input
+                                    type="email"
+                                    value={editData.email}
+                                    onChange={e => setEditData('email', e.target.value)}
+                                    className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                {editErrors.email && <p className="mt-1 text-xs text-red-500">{editErrors.email}</p>}
+                            </div>
+
+                            {/* Opt-ins */}
+                            <div>
+                                <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Communication Opt-ins</label>
+                                <div className="mt-2 flex flex-wrap gap-3">
+                                    {[
+                                        ['opt_in_whatsapp', '💬 WhatsApp'],
+                                        ['opt_in_sms', '📱 SMS'],
+                                        ['opt_in_email', '📧 Email'],
+                                    ].map(([key, label]) => (
+                                        <label key={key} className="flex items-center gap-2 cursor-pointer text-sm text-neutral-700 dark:text-neutral-300">
+                                            <input
+                                                type="checkbox"
+                                                checked={editData[key]}
+                                                onChange={e => setEditData(key, e.target.checked)}
+                                                className="rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                                            />
+                                            {label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                    type="submit"
+                                    disabled={editProcessing}
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 transition"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    {editProcessing ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={closeEditModal}
+                                    className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-5 py-2.5 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                                >
+                                    Cancel
                                 </button>
                             </div>
                         </form>
