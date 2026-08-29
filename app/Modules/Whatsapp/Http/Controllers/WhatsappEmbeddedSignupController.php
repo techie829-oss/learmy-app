@@ -43,13 +43,13 @@ class WhatsappEmbeddedSignupController extends Controller
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
         // IMPORTANT: Meta OAuth codes are SINGLE-USE — do NOT retry with multiple candidates.
-        // The redirect_uri for config_id Business Login token exchange must match the
-        // redirect_uri passed to the frontend FB.login function.
+        // For JS SDK popup flows without frontend redirect_uri, exchange the code by passing
+        // the Meta universal fallback URL: 'https://facebook.com'
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => $validated['redirect_uri'] ?? 'https://www.facebook.com/connect/login_success.html',
+            'redirect_uri'  => 'https://facebook.com',
         ];
 
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
