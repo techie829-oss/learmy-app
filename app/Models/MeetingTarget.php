@@ -10,6 +10,7 @@ class MeetingTarget extends Model
         'meeting_id',
         'target_type',
         'target_id',
+        'notify_mode',
     ];
 
     public function meeting()

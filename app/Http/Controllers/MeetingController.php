@@ -131,8 +131,9 @@ class MeetingController extends Controller
 
             // Process and Save Smart Mapping Targets (auto-sync WA Groups to ContactTag if selected)
             foreach ($validated['targets'] ?? [] as $target) {
-                $targetType = $target['type'] ?? '';
-                $targetId   = $target['id'] ?? null;
+                $targetType  = $target['type'] ?? '';
+                $targetId    = $target['id'] ?? null;
+                $notifyMode  = $target['notify_mode'] ?? 'group'; // 'group' | 'individual'
 
                 if ($targetType === 'wa_group') {
                     $groupName = $target['name'] ?? 'WhatsApp Group';
@@ -142,6 +143,7 @@ class MeetingController extends Controller
                             'meeting_id'  => $meeting->id,
                             'target_type' => ContactTag::class,
                             'target_id'   => $tagId,
+                            'notify_mode' => $notifyMode,
                         ]);
                     }
                 } else {
@@ -149,6 +151,7 @@ class MeetingController extends Controller
                         'meeting_id'  => $meeting->id,
                         'target_type' => $targetType,
                         'target_id'   => (int) $targetId,
+                        'notify_mode' => 'individual', // Tags/Segments → always individual
                     ]);
                 }
             }
@@ -237,8 +240,9 @@ class MeetingController extends Controller
             // Replace targets
             $meeting->targets()->delete();
             foreach ($validated['targets'] ?? [] as $target) {
-                $targetType = $target['type'] ?? '';
-                $targetId   = $target['id'] ?? null;
+                $targetType  = $target['type'] ?? '';
+                $targetId    = $target['id'] ?? null;
+                $notifyMode  = $target['notify_mode'] ?? 'group';
 
                 if ($targetType === 'wa_group') {
                     $groupName = $target['name'] ?? 'WhatsApp Group';
@@ -248,6 +252,7 @@ class MeetingController extends Controller
                             'meeting_id'  => $meeting->id,
                             'target_type' => ContactTag::class,
                             'target_id'   => $tagId,
+                            'notify_mode' => $notifyMode,
                         ]);
                     }
                 } else {
@@ -255,6 +260,7 @@ class MeetingController extends Controller
                         'meeting_id'  => $meeting->id,
                         'target_type' => $targetType,
                         'target_id'   => (int) $targetId,
+                        'notify_mode' => 'individual',
                     ]);
                 }
             }

@@ -42,14 +42,15 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
-        // We will try multiple candidates for redirect_uri, since Meta is extremely strict 
-        // and sometimes behaves unpredictably depending on the App Config and SDK version.
+        // For Meta FB.login JS SDK embedded signup, Meta requires redirect_uri to be 
+        // an empty string '' or omitted (null). Trying an explicit URL first burns the 
+        // single-use authorization code if Meta rejects it.
         $candidates = [
-            $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 1. Exact setup page
-            rtrim((string) config('app.url'), '/'),                                 // 2. Base domain (no slash)
-            rtrim((string) config('app.url'), '/') . '/',                           // 3. Base domain with trailing slash
-            '',                                                                     // 4. Empty string
-            null,                                                                   // 5. No redirect_uri parameter
+            '',                                                                     // 1. Empty string (Standard for FB.login SDK)
+            null,                                                                   // 2. Omitted (No parameter)
+            'https://www.facebook.com/v20.0/dialog/oauth',                         // 3. Dialog OAuth fallback
+            $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 4. Exact setup page
+            rtrim((string) config('app.url'), '/'),                                 // 5. Base domain
         ];
 
         $tokenRes = null;

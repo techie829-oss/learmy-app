@@ -57,7 +57,7 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
                 e.target.value = '';
                 return;
             }
-            const newTargets = [...selectedTargets, { type: 'wa_group', id: groupId, name: groupName }];
+            const newTargets = [...selectedTargets, { type: 'wa_group', id: groupId, name: groupName, notify_mode: 'group' }];
             setSelectedTargets(newTargets);
             setData('targets', newTargets);
         } else {
@@ -79,18 +79,26 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
         setData('targets', newTargets);
     };
 
+    const toggleGroupNotifyMode = (index, mode) => {
+        const newTargets = selectedTargets.map((t, i) =>
+            i === index ? { ...t, notify_mode: mode } : t
+        );
+        setSelectedTargets(newTargets);
+        setData('targets', newTargets);
+    };
+
     const getTargetName = (target) => {
         if (!target || !target.type) return 'Unknown Target';
         if (target.type === 'wa_group') {
-            return `💬 WA Group: ${target.name || target.id}`;
+            return `💬 ${target.name || target.id}`;
         }
         if (typeof target.type === 'string' && target.type.includes('ContactTag')) {
             const tag = tags.find(t => t.id === target.id);
-            return `Batch: ${tag ? tag.name : 'Unknown'}`;
+            return `🏷️ Batch: ${tag ? tag.name : 'Unknown'}`;
         }
         if (typeof target.type === 'string' && target.type.includes('Segment')) {
             const seg = segments.find(s => s.id === target.id);
-            return `Segment: ${seg ? seg.name : 'Unknown'}`;
+            return `📂 Segment: ${seg ? seg.name : 'Unknown'}`;
         }
         return 'Unknown Target';
     };
@@ -293,18 +301,58 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
                             </select>
 
                             {selectedTargets.length > 0 ? (
-                                <div className="mt-3 flex flex-wrap gap-2">
+                                <div className="mt-3 space-y-2">
                                     {selectedTargets.map((target, index) => (
-                                        <span key={index} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-                                            {getTargetName(target)}
-                                            <button
-                                                type="button"
-                                                onClick={() => removeTarget(index)}
-                                                className="ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-500 focus:outline-none dark:hover:bg-brand-800"
-                                            >
-                                                &times;
-                                            </button>
-                                        </span>
+                                        <div key={index}>
+                                            {/* Target chip */}
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+                                                {getTargetName(target)}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTarget(index)}
+                                                    className="ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-500 focus:outline-none dark:hover:bg-brand-800"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </span>
+
+                                            {/* Notify mode toggle — only for WA Groups */}
+                                            {target.type === 'wa_group' && (
+                                                <div className="mt-1.5 ml-1 flex items-center gap-1 flex-wrap">
+                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mr-1">Send as:</span>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleGroupNotifyMode(index, 'group')}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                                                            target.notify_mode === 'group' || !target.notify_mode
+                                                                ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                                                : 'bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-green-400'
+                                                        }`}
+                                                    >
+                                                        💬 Group Message
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleGroupNotifyMode(index, 'individual')}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                                                            target.notify_mode === 'individual'
+                                                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                                                : 'bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-blue-400'
+                                                        }`}
+                                                    >
+                                                        👤 Individual Messages
+                                                    </button>
+
+                                                    <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">
+                                                        {target.notify_mode === 'individual'
+                                                            ? '(Personal msg to each member)'
+                                                            : '(One msg to group chat)'}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             ) : (
