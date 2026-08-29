@@ -52,7 +52,8 @@ async function getOrCreateSession(sessionId) {
         qr: null,
         status: 'initializing',
         user: null,
-        sessionId
+        sessionId,
+        contactsCache: new Map(), // JID → { name } — populated from contacts.upsert events
     };
 
     const sock = makeWASocket({
@@ -127,6 +128,13 @@ async function getOrCreateSession(sessionId) {
 
     sock.ev.on('contacts.upsert', (contacts) => {
         for (const c of contacts) {
+            // Cache name/notify for later use (e.g. group participant import)
+            if (c.id) {
+                const existing = sessionData.contactsCache.get(c.id) || {};
+                const name = c.name || c.notify || existing.name || null;
+                if (name) sessionData.contactsCache.set(c.id, { name });
+            }
+
             // c.id = phone JID (e.g. 917007420572@s.whatsapp.net)
             // c.lid = LID JID (e.g. 32495856832586@lid)
             if (c.id && c.id.endsWith('@s.whatsapp.net')) {
@@ -150,6 +158,13 @@ async function getOrCreateSession(sessionId) {
 
     sock.ev.on('contacts.update', (updates) => {
         for (const c of updates) {
+            // Update name in cache
+            if (c.id) {
+                const existing = sessionData.contactsCache.get(c.id) || {};
+                const name = c.name || c.notify || existing.name || null;
+                if (name) sessionData.contactsCache.set(c.id, { name });
+            }
+
             if (c.id && c.id.endsWith('@s.whatsapp.net')) {
                 const phone = c.id.split('@')[0];
                 if (c.lid) {
@@ -579,10 +594,22 @@ app.get('/api/groups/:groupId/participants', async (req, res) => {
         const participants = (metadata.participants || []).map((p) => {
             // JID format: 919876543210:4@s.whatsapp.net or 919876543210@s.whatsapp.net
             const phone = p.id.split(':')[0].split('@')[0];
+
+            // Normalize JID to standard format for cache lookup
+            const normalizedJid = `${phone}@s.whatsapp.net`;
+
+            // Look up display name from in-memory contacts cache
+            // (populated via contacts.upsert events from WhatsApp Web sync)
+            const cached = session.contactsCache?.get(normalizedJid)
+                        || session.contactsCache?.get(p.id)
+                        || null;
+            const pushName = cached?.name || null;
+
             return {
-                jid:   p.id,
-                phone: `+${phone}`,
-                admin: p.admin === 'admin' || p.admin === 'superadmin',
+                jid:      p.id,
+                phone:    `+${phone}`,
+                name:     pushName,   // will be null if not in contact book
+                admin:    p.admin === 'admin' || p.admin === 'superadmin',
             };
         });
 

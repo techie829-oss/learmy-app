@@ -168,8 +168,8 @@ class WhatsappGroupController extends Controller
                     $contact = Contact::create([
                         'workspace_id'      => $workspaceId,
                         'phone_e164'        => $phone,
-                        'first_name'        => 'WA Contact',
-                        'last_name'         => ltrim($phone, '+'),
+                        'first_name'        => $participant['name'] ?? 'Student',
+                        'last_name'         => null,
                         'opt_in_whatsapp'   => true,
                         'source'            => 'whatsapp_group',
                     ]);
