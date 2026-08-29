@@ -42,21 +42,34 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
-        // IMPORTANT: Meta OAuth codes are SINGLE-USE — do NOT retry with multiple candidates.
-        // For JS SDK popup flows without frontend redirect_uri, exchange the code by passing
-        // the Meta universal fallback URL: 'https://facebook.com'
+        $redirectUri = rtrim((string) config('app.url'), '/');
+
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => 'https://facebook.com',
         ];
+
+        if ($redirectUri !== '') {
+            $tokenParams['redirect_uri'] = $redirectUri;
+        }
 
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
 
+        // Some Meta app configs reject redirect_uri on embedded-signup codes — retry without it.
+        if ((! $tokenRes->successful() || empty($tokenRes->json('access_token'))) && isset($tokenParams['redirect_uri'])) {
+            Log::info('WhatsApp embedded signup: primary exchange failed, retrying without redirect_uri', [
+                'workspace_id' => $workspaceId,
+                'status'       => $tokenRes->status(),
+                'error'        => $tokenRes->json('error.message'),
+            ]);
+            unset($tokenParams['redirect_uri']);
+            $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
+        }
+
         Log::info('WhatsApp embedded signup: code exchange attempt', [
             'workspace_id' => $workspaceId,
-            'redirect_uri' => $tokenParams['redirect_uri'],
+            'redirect_uri' => $tokenParams['redirect_uri'] ?? 'OMITTED',
             'api_version'  => 'v20.0',
             'status'       => $tokenRes->status(),
             'error'        => $tokenRes->json('error.message') ?? null,
