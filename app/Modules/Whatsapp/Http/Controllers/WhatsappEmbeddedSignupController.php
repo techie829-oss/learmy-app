@@ -40,7 +40,7 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v22.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
         // IMPORTANT: Meta OAuth codes are SINGLE-USE — do NOT retry with multiple candidates.
         // The redirect_uri for config_id Business Login token exchange must match the
@@ -49,7 +49,7 @@ class WhatsappEmbeddedSignupController extends Controller
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'),
+            'redirect_uri'  => $validated['redirect_uri'] ?? 'https://www.facebook.com/connect/login_success.html',
         ];
 
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
@@ -57,7 +57,7 @@ class WhatsappEmbeddedSignupController extends Controller
         Log::info('WhatsApp embedded signup: code exchange attempt', [
             'workspace_id' => $workspaceId,
             'redirect_uri' => $tokenParams['redirect_uri'],
-            'api_version'  => 'v22.0',
+            'api_version'  => 'v20.0',
             'status'       => $tokenRes->status(),
             'error'        => $tokenRes->json('error.message') ?? null,
             'subcode'      => $tokenRes->json('error.error_subcode') ?? null,

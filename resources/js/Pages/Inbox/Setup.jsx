@@ -911,7 +911,7 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
             messenger: { feature_type: 'messenger_chat' },
         };
 
-        const redirectUri = window.location.origin + '/app/inbox/setup';
+        const redirectUri = 'https://www.facebook.com/connect/login_success.html';
 
         window.FB.login(
             (response) => {
