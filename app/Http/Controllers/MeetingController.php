@@ -396,23 +396,17 @@ class MeetingController extends Controller
         try {
             $templates = WhatsappTemplate::where('workspace_id', $workspaceId)
                 ->where('status', 'APPROVED')
-                ->get(['id', 'name', 'display_name'])
+                ->get(['id', 'name', 'language', 'category'])
                 ->map(fn($t) => [
                     'value' => $t->name,
-                    'label' => $t->display_name ?? $t->name,
+                    'label' => "{$t->name} (" . ucfirst(strtolower($t->category)) . ' • ' . strtoupper($t->language) . ')',
                 ])
                 ->toArray();
 
-            array_unshift($templates, [
-                'value' => 'class_scheduled_notification',
-                'label' => 'Default Class Reminder (built-in)',
-            ]);
-
             return $templates;
         } catch (\Throwable $e) {
-            return [
-                ['value' => 'class_scheduled_notification', 'label' => 'Default Class Reminder (built-in)'],
-            ];
+            \Illuminate\Support\Facades\Log::error('[MeetingController] Exception fetching whatsapp templates: ' . $e->getMessage());
+            return [];
         }
     }
 }
