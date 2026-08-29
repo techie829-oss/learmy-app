@@ -40,49 +40,33 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v22.0');
 
-        // For Meta FB.login JS SDK embedded signup (config_id + override_default_response_type),
-        // Meta JS SDK registers 'https://www.facebook.com/dialog/return/arbiter' as the OAuth
-        // redirect_uri. Backend token exchange MUST pass this exact URL to avoid subcode 36008.
-        $candidates = [
-            'https://www.facebook.com/dialog/return/arbiter',                     // 1. Meta JS SDK Official Return Arbiter
-            null,                                                                   // 2. Omitted
-            $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 3. Setup page
+        // IMPORTANT: Meta OAuth codes are SINGLE-USE.
+        // For config_id-based Embedded Signup (FB.login with override_default_response_type:true),
+        // the SDK does NOT use a redirect_uri — it uses an internal popup flow.
+        // Per Meta docs for Business Login / config_id flow: pass redirect_uri as empty string "".
+        // We must NOT retry with multiple candidates — each failed attempt burns the code permanently.
+        $tokenParams = [
+            'client_id'     => $meta->appId(),
+            'client_secret' => $meta->appSecret(),
+            'code'          => $validated['code'],
+            'redirect_uri'  => '',  // Empty string — correct for config_id embedded signup (Business Login)
         ];
 
-        $tokenRes = null;
-        $successCandidate = null;
+        $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
 
-        foreach ($candidates as $index => $redirectUri) {
-            $tokenParams = [
-                'client_id'     => $meta->appId(),
-                'client_secret' => $meta->appSecret(),
-                'code'          => $validated['code'],
-            ];
+        Log::info('WhatsApp embedded signup: code exchange attempt', [
+            'workspace_id' => $workspaceId,
+            'redirect_uri' => '"" (empty — config_id Business Login flow)',
+            'api_version'  => 'v22.0',
+            'status'       => $tokenRes->status(),
+            'error'        => $tokenRes->json('error.message') ?? null,
+            'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
+        ]);
 
-            if ($redirectUri !== null) {
-                $tokenParams['redirect_uri'] = $redirectUri;
-            }
-
-            $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
-
-            Log::info("WhatsApp embedded signup: code exchange attempt " . ($index + 1), [
-                'workspace_id' => $workspaceId,
-                'redirect_uri' => $redirectUri ?? 'NONE',
-                'status'       => $tokenRes->status(),
-                'error'        => $tokenRes->json('error.message') ?? null,
-                'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
-            ]);
-
-            if ($tokenRes->successful() && !empty($tokenRes->json('access_token'))) {
-                $successCandidate = $redirectUri ?? 'NONE';
-                break;
-            }
-        }
-
-        if (! $tokenRes || ! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
-            Log::warning('WhatsApp embedded signup: code exchange failed all attempts', [
+        if (! $tokenRes->successful() || empty($tokenRes->json('access_token'))) {
+            Log::warning('WhatsApp embedded signup: code exchange failed', [
                 'workspace_id' => $workspaceId,
                 'app_id'       => $meta->appId(),
                 'status'       => $tokenRes->status(),
@@ -96,7 +80,6 @@ class WhatsappEmbeddedSignupController extends Controller
 
         Log::info('WhatsApp embedded signup: code exchange SUCCESS', [
             'workspace_id' => $workspaceId,
-            'successful_redirect_uri' => $successCandidate
         ]);
 
 

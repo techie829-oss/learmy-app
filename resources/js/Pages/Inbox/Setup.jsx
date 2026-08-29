@@ -564,10 +564,8 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     code,
                     waba_id: wabaId,
                     phone_number_id: phoneNumberId,
-                    // For config_id (Business Login) flow, Meta requires redirect_uri
-                    // in the token exchange. It must match the URI registered in
-                    // Business Login configuration settings for config_id 4581232788790875.
-                    redirect_uri: window.location.origin + '/app/inbox/setup',
+                    // Note: redirect_uri is NOT sent for config_id embedded signup flow.
+                    // Backend uses empty string "" as required by Meta Business Login spec.
                 }),
             });
             const json = await res.json();
