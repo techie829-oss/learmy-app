@@ -42,13 +42,13 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
 
-        // For Meta FB.login JS SDK embedded signup (config_id flow), Meta Graph API expects
-        // NO redirect_uri parameter (null). Passing an explicit redirect_uri or empty string
-        // causes Meta to reject with subcode 36008 (invalid verification code).
+        // For Meta FB.login JS SDK embedded signup (config_id + override_default_response_type),
+        // Meta JS SDK registers 'https://www.facebook.com/dialog/return/arbiter' as the OAuth
+        // redirect_uri. Backend token exchange MUST pass this exact URL to avoid subcode 36008.
         $candidates = [
-            null,                                                                   // 1. Omitted (Standard for FB.login Embedded Signup)
-            $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 2. Exact setup page
-            '',                                                                     // 3. Empty string
+            'https://www.facebook.com/dialog/return/arbiter',                     // 1. Meta JS SDK Official Return Arbiter
+            null,                                                                   // 2. Omitted
+            $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'), // 3. Setup page
         ];
 
         $tokenRes = null;
