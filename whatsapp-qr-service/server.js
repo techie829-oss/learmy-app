@@ -56,20 +56,50 @@ async function getOrCreateSession(sessionId) {
         contactsCache: new Map(), // JID → { name } — populated from contacts.upsert events
     };
 
+    // In-memory message store for getMessage callback (fixes "Waiting for this message" decryption error)
+    // WhatsApp servers retry message delivery and need to fetch the original message from sender.
+    const msgStore = new Map(); // msgId → message object
+
     const sock = makeWASocket({
         version,
         logger,
         printQRInTerminal: false,
         browser: Browsers.macOS('Chrome'), // Simulates standard macOS Google Chrome to avoid VPS IP security flags
-        keepAliveIntervalMs: 30000, // Ping socket every 30s to prevent Malaysia VPS TCP drops
+        keepAliveIntervalMs: 30000,         // Ping socket every 30s to prevent TCP drops
         markOnlineOnConnect: true,
-        syncFullHistory: false, // Prevents loading full multi-year chat archives; only recent & unread messages sync
+        syncFullHistory: false,             // Prevents loading full multi-year chat archives
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, logger)
         },
-        generateHighQualityLinkPreview: true
+        generateHighQualityLinkPreview: false, // Disabled — causes decryption delays on recipient side
+
+        // ── CRITICAL: getMessage callback ────────────────────────────────────
+        // Without this, recipients see "Waiting for this message. This may take
+        // a while." because WA servers can't re-fetch the encrypted payload for
+        // retry delivery. This function returns a stored copy of the message.
+        getMessage: async (key) => {
+            const stored = msgStore.get(key.id);
+            if (stored) return stored;
+            // Fallback: return a blank conversation message so WA can deliver
+            return { conversation: '' };
+        },
     });
+
+    // Populate msgStore when we send messages so getMessage can find them
+    sock.ev.on('messages.upsert', ({ messages }) => {
+        for (const msg of messages) {
+            if (msg.key?.id && msg.message) {
+                msgStore.set(msg.key.id, msg.message);
+                // Keep store bounded — remove oldest entries beyond 500
+                if (msgStore.size > 500) {
+                    const firstKey = msgStore.keys().next().value;
+                    msgStore.delete(firstKey);
+                }
+            }
+        }
+    });
+
 
     sessionData.sock = sock;
     activeSessions.set(sessionId, sessionData);
