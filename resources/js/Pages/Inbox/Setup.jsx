@@ -548,9 +548,10 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
     const [waApiError, setWaApiError] = useState(null);
     const [waSubmitting, setWaSubmitting] = useState(false);
 
-    const handleWaEmbeddedCode = useCallback(async (code, wabaId, phoneNumberId = null) => {
+    const handleWaEmbeddedCode = useCallback(async (code, wabaId, phoneNumberId = null, redirectUri = null) => {
         setWaApiError(null);
         setWaSubmitting(true);
+        console.log('Sending embedded signup code to backend with redirect_uri:', redirectUri);
 
         try {
             const res = await fetch(route('client.whatsapp.setup.embedded-signup'), {
@@ -564,8 +565,7 @@ function WhatsAppSection({ wabas, webhookGlobalUrl, channelAccountsByWaba, chatb
                     code,
                     waba_id: wabaId,
                     phone_number_id: phoneNumberId,
-                    // Note: redirect_uri is NOT sent for config_id embedded signup flow.
-                    // Backend uses empty string "" as required by Meta Business Login spec.
+                    redirect_uri: redirectUri,
                 }),
             });
             const json = await res.json();
@@ -911,6 +911,8 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
             messenger: { feature_type: 'messenger_chat' },
         };
 
+        const redirectUri = window.location.origin + '/app/inbox/setup';
+
         window.FB.login(
             (response) => {
                 if (response.authResponse && response.authResponse.code) {
@@ -919,12 +921,12 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
                         sessionInfoPromise
                             .then((info) => {
                                 setLoading(false);
-                                onCode(code, info?.waba_id ?? null, info?.phone_number_id ?? null);
+                                onCode(code, info?.waba_id ?? null, info?.phone_number_id ?? null, redirectUri);
                             })
-                            .catch(() => { setLoading(false); onCode(code, null, null); });
+                            .catch(() => { setLoading(false); onCode(code, null, null, redirectUri); });
                     } else {
                         setLoading(false);
-                        onCode(code);
+                        onCode(code, redirectUri);
                     }
                 } else {
                     setLoading(false);
@@ -938,6 +940,7 @@ function EmbeddedSignupButton({ configId, appId, channel, label, color, onCode, 
                 response_type: 'code',
                 override_default_response_type: true,
                 extras: extrasMap[channel] ?? {},
+                redirect_uri: redirectUri,
             },
         );
     }, [configId, resolvedAppId, channel, onCode, t]);

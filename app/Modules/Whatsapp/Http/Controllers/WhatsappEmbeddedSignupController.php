@@ -43,22 +43,20 @@ class WhatsappEmbeddedSignupController extends Controller
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v22.0');
 
         // IMPORTANT: Meta OAuth codes are SINGLE-USE — do NOT retry with multiple candidates.
-        // The correct redirect_uri for config_id Business Login embedded signup token exchange
-        // is the page URL registered in the Meta Business Login Configuration (config_id).
-        // This matches the fallback_redirect_uri visible in the OAuth popup URL:
-        // fallback_redirect_uri=https://learmy.solidrix.com/app/inbox/setup
+        // The redirect_uri for config_id Business Login token exchange must match the
+        // redirect_uri passed to the frontend FB.login function.
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => config('app.url') . '/app/inbox/setup',
+            'redirect_uri'  => $validated['redirect_uri'] ?? (config('app.url') . '/app/inbox/setup'),
         ];
 
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
 
         Log::info('WhatsApp embedded signup: code exchange attempt', [
             'workspace_id' => $workspaceId,
-            'redirect_uri' => '"" (empty — config_id Business Login flow)',
+            'redirect_uri' => $tokenParams['redirect_uri'],
             'api_version'  => 'v22.0',
             'status'       => $tokenRes->status(),
             'error'        => $tokenRes->json('error.message') ?? null,
