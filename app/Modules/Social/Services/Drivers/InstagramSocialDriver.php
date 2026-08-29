@@ -40,15 +40,15 @@ class InstagramSocialDriver implements SocialNetworkInterface
             throw new \RuntimeException('Instagram posts require at least one image.');
         }
 
-        $container = Http::post("https://graph.facebook.com/v19.0/{$igUserId}/media", $containerPayload)->json();
-        $creationId = $container['id'] ?? null;
-        if (! $creationId) {
-            throw new \RuntimeException('Instagram container creation failed: '.json_encode($container));
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $container = Http::post("{$graphUrl}/{$igUserId}/media", $containerPayload)->json();
+
+        if (empty($container['id'])) {
+            throw new \Exception('Failed to create media container: ' . json_encode($container));
         }
 
-        // Step 2: Publish
-        $res = Http::post("https://graph.facebook.com/v19.0/{$igUserId}/media_publish", [
-            'creation_id' => $creationId,
+        $res = Http::post("{$graphUrl}/{$igUserId}/media_publish", [
+            'creation_id'  => $container['id'],
             'access_token' => $token,
         ])->json();
 

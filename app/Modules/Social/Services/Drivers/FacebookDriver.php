@@ -14,7 +14,8 @@ class FacebookDriver implements SocialNetworkInterface
 
     public function fetchAccountInfo(string $accessToken): array
     {
-        $res = Http::get('https://graph.facebook.com/v19.0/me', [
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $res = Http::get("{$graphUrl}/me", [
             'fields' => 'id,name,picture',
             'access_token' => $accessToken,
         ])->json();
@@ -35,7 +36,7 @@ class FacebookDriver implements SocialNetworkInterface
 
         // Single image → POST /{page}/photos
         if (count($mediaUrls) === 1) {
-            $res = Http::post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
+            $res = Http::post("{$graphUrl}/{$pageId}/photos", [
                 'url'          => $mediaUrls[0],
                 'caption'      => $message,
                 'access_token' => $token,
@@ -53,7 +54,7 @@ class FacebookDriver implements SocialNetworkInterface
             $attachedMedia = [];
 
             foreach ($mediaUrls as $url) {
-                $upload = Http::post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
+                $upload = Http::post("{$graphUrl}/{$pageId}/photos", [
                     'url'          => $url,
                     'published'    => false,
                     'access_token' => $token,
@@ -66,7 +67,7 @@ class FacebookDriver implements SocialNetworkInterface
                 $attachedMedia[] = ['media_fbid' => $upload['id']];
             }
 
-            $res = Http::post("https://graph.facebook.com/v19.0/{$pageId}/feed", [
+            $res = Http::post("{$graphUrl}/{$pageId}/feed", [
                 'message'        => $message,
                 'attached_media' => $attachedMedia,
                 'access_token'   => $token,
@@ -80,7 +81,7 @@ class FacebookDriver implements SocialNetworkInterface
         }
 
         // Text-only post
-        $res = Http::post("https://graph.facebook.com/v19.0/{$pageId}/feed", [
+        $res = Http::post("{$graphUrl}/{$pageId}/feed", [
             'message'      => $message,
             'link'         => $postData['link'] ?? null,
             'access_token' => $token,

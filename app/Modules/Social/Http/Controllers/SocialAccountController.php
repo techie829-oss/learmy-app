@@ -99,7 +99,8 @@ class SocialAccountController extends Controller
                 ? 'id,name,access_token,picture,instagram_business_account{id,name,username,profile_picture_url}'
                 : 'id,name,access_token,picture';
 
-            $pagesResp = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+            $pagesResp = Http::get("{$graphUrl}/me/accounts", [
                 'access_token' => $tokens['access_token'],
                 'fields' => $fields,
             ])->json();
