@@ -42,16 +42,16 @@ class WhatsappEmbeddedSignupController extends Controller
 
         $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v22.0');
 
-        // IMPORTANT: Meta OAuth codes are SINGLE-USE.
-        // For config_id-based Embedded Signup (FB.login with override_default_response_type:true),
-        // the SDK does NOT use a redirect_uri — it uses an internal popup flow.
-        // Per Meta docs for Business Login / config_id flow: pass redirect_uri as empty string "".
-        // We must NOT retry with multiple candidates — each failed attempt burns the code permanently.
+        // IMPORTANT: Meta OAuth codes are SINGLE-USE — do NOT retry with multiple candidates.
+        // The correct redirect_uri for config_id Business Login embedded signup token exchange
+        // is the page URL registered in the Meta Business Login Configuration (config_id).
+        // This matches the fallback_redirect_uri visible in the OAuth popup URL:
+        // fallback_redirect_uri=https://learmy.solidrix.com/app/inbox/setup
         $tokenParams = [
             'client_id'     => $meta->appId(),
             'client_secret' => $meta->appSecret(),
             'code'          => $validated['code'],
-            'redirect_uri'  => '',  // Empty string — correct for config_id embedded signup (Business Login)
+            'redirect_uri'  => config('app.url') . '/app/inbox/setup',
         ];
 
         $tokenRes = Http::get("{$graphUrl}/oauth/access_token", $tokenParams);
