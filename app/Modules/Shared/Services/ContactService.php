@@ -65,6 +65,23 @@ class ContactService
 
         foreach ($rows as $row) {
             try {
+                $row = $this->normalizeRowKeys($row);
+
+                if (! empty($row['phone_e164'])) {
+                    $norm = self::normalizePhone($row['phone_e164']);
+                    if ($norm) {
+                        $row['phone_e164'] = $norm;
+                    } else {
+                        unset($row['phone_e164']);
+                    }
+                }
+
+                if (empty($row['phone_e164']) && empty($row['email'])) {
+                    $stats['skipped']++;
+
+                    continue;
+                }
+
                 $existing = Contact::where('workspace_id', $workspaceId)
                     ->when(! empty($row['phone_e164']), fn ($q) => $q->where('phone_e164', $row['phone_e164']))
                     ->orWhere(fn ($q) => $q->where('workspace_id', $workspaceId)->where('email', $row['email'] ?? '__none__'))
@@ -98,7 +115,8 @@ class ContactService
 
         foreach ($rows as $row) {
             $phone = isset($row['phone_e164']) ? trim((string) $row['phone_e164']) : '';
-            if ($phone === '' || ! str_starts_with($phone, '+')) {
+            $phone = $phone !== '' ? self::normalizePhone($phone) : null;
+            if (! $phone) {
                 $stats['skipped']++;
 
                 continue;
@@ -234,5 +252,82 @@ class ContactService
                 'source' => $c->source,
                 'created_at' => $c->created_at?->toISOString(),
             ]);
+    }
+
+    /** Normalize a phone number to E.164. */
+    public static function normalizePhone(string $phone): ?string
+    {
+        if (str_contains($phone, '@')) {
+            $phone = explode('@', $phone)[0];
+        }
+
+        if (str_contains($phone, '-')) {
+            $parts = explode('-', $phone);
+            if (is_numeric($parts[0]) && strlen($parts[0]) >= 8) {
+                $phone = $parts[0];
+            } else {
+                return null;
+            }
+        }
+
+        if (stripos($phone, 'e+') !== false || stripos($phone, 'e-') !== false) {
+            $phone = (string) (float) $phone;
+        }
+
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+
+        if (empty($cleaned)) {
+            return null;
+        }
+
+        if (! str_starts_with($cleaned, '+')) {
+            $cleaned = '+'.$cleaned;
+        }
+
+        return $cleaned;
+    }
+
+    /** Map various header names to DB columns. */
+    private function normalizeRowKeys(array $row): array
+    {
+        $normalized = [];
+        $phoneKeys = ['phone_e164', 'phone', 'phone number', 'phonenumber', 'number', 'mobile', 'contact', 'jid', 'whatsapp', 'whatsapp id', 'whatsapp_id', 'user id', 'userid'];
+        $emailKeys = ['email', 'email address', 'emailaddress', 'mail'];
+        $firstNameKeys = ['first_name', 'firstname', 'first name', 'given name', 'givenname'];
+        $lastNameKeys = ['last_name', 'lastname', 'last name', 'sur name', 'surname'];
+        $fullNameKeys = ['name', 'full_name', 'fullname', 'full name', 'display_name', 'displayname'];
+        $countryKeys = ['country', 'country_code', 'countrycode', 'nation'];
+        $languageKeys = ['language', 'lang'];
+
+        foreach ($row as $key => $val) {
+            $lowerKey = trim(strtolower($key));
+
+            if (in_array($lowerKey, $phoneKeys, true)) {
+                $normalized['phone_e164'] = $val;
+            } elseif (in_array($lowerKey, $emailKeys, true)) {
+                $normalized['email'] = $val;
+            } elseif (in_array($lowerKey, $firstNameKeys, true)) {
+                $normalized['first_name'] = $val;
+            } elseif (in_array($lowerKey, $lastNameKeys, true)) {
+                $normalized['last_name'] = $val;
+            } elseif (in_array($lowerKey, $fullNameKeys, true)) {
+                $normalized['name'] = $val;
+            } elseif (in_array($lowerKey, $countryKeys, true)) {
+                $normalized['country'] = $val;
+            } elseif (in_array($lowerKey, $languageKeys, true)) {
+                $normalized['language'] = $val;
+            } else {
+                $normalized[$key] = $val;
+            }
+        }
+
+        if (! empty($normalized['name']) && empty($normalized['first_name'])) {
+            $parts = preg_split('/\s+/u', trim($normalized['name']), 2) ?: [];
+            $normalized['first_name'] = $parts[0] ?? null;
+            $normalized['last_name'] = $parts[1] ?? null;
+        }
+        unset($normalized['name']);
+
+        return $normalized;
     }
 }
