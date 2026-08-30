@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
-import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink, Clock, Sun, Zap, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink, Clock, Sun, Zap, PlayCircle, MapPin } from 'lucide-react';
 
 export default function Create({ tags = [], segments = [], waGroups = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
     const isEdit = !!meeting;
@@ -32,6 +32,8 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
         workspace_id:                workspace_id,
         title:                       isEdit ? meeting.title : '',
         description:                 isEdit ? (meeting.description ?? '') : '',
+        class_type:                  isEdit ? (meeting.class_type || 'online') : 'online',
+        location:                    isEdit ? (meeting.location ?? '') : '',
         start_time:                  isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
         end_time:                    isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
         timezone:                    isEdit ? (meeting.timezone || 'Asia/Kolkata') : (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata' : 'Asia/Kolkata'),
@@ -238,31 +240,84 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
                             </div>
                         </div>
 
-                        {/* Meeting Link */}
+                        {/* Class Mode / Type */}
                         <div>
-                            <label htmlFor="custom_meet_link" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                Meeting Link (Optional Zoom / Google Meet URL)
+                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                                Class Mode / Type <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                id="custom_meet_link"
-                                type="url"
-                                placeholder="Leave empty to auto-generate Google Meet link..."
-                                value={data.custom_meet_link}
-                                onChange={e => setData('custom_meet_link', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
-                            />
-                            {!data.custom_meet_link ? (
-                                <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                    <Video className="h-3.5 w-3.5" />
-                                    Google Meet link will be automatically generated upon saving.
-                                </p>
-                            ) : (
-                                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                    Custom link entered. Google Meet auto-generation skipped.
-                                </p>
-                            )}
-                            {errors.custom_meet_link && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.custom_meet_link}</p>}
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setData('class_type', 'online')}
+                                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all ${
+                                        data.class_type === 'online'
+                                            ? 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-500 ring-2 ring-brand-500/20'
+                                            : 'border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 hover:bg-neutral-50'
+                                    }`}
+                                >
+                                    <Video className="h-4 w-4" /> 🌐 Online Class
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setData('class_type', 'offline')}
+                                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all ${
+                                        data.class_type === 'offline'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-500 ring-2 ring-purple-500/20'
+                                            : 'border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 hover:bg-neutral-50'
+                                    }`}
+                                >
+                                    <MapPin className="h-4 w-4" /> 📍 Offline (In-Person) Class
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Meeting Link (Online) or Venue Location (Offline) */}
+                        {data.class_type === 'online' ? (
+                            <div>
+                                <label htmlFor="custom_meet_link" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                    Meeting Link (Optional Zoom / Google Meet URL)
+                                </label>
+                                <input
+                                    id="custom_meet_link"
+                                    type="url"
+                                    placeholder="Leave empty to auto-generate Google Meet link..."
+                                    value={data.custom_meet_link}
+                                    onChange={e => setData('custom_meet_link', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
+                                />
+                                {!data.custom_meet_link ? (
+                                    <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                        <Video className="h-3.5 w-3.5" />
+                                        Google Meet link will be automatically generated upon saving for online class.
+                                    </p>
+                                ) : (
+                                    <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                        Custom link entered. Google Meet auto-generation skipped.
+                                    </p>
+                                )}
+                                {errors.custom_meet_link && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.custom_meet_link}</p>}
+                            </div>
+                        ) : (
+                            <div>
+                                <label htmlFor="location" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                    Venue / Class Location Address <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    id="location"
+                                    type="text"
+                                    placeholder="e.g. Learmy Institute, Classroom 204, Indiranagar, Bengaluru"
+                                    value={data.location}
+                                    onChange={e => setData('location', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-neutral-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-white sm:text-sm"
+                                    required={data.class_type === 'offline'}
+                                />
+                                <p className="mt-1.5 flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    This location address will be sent to students in WhatsApp reminders.
+                                </p>
+                                {errors.location && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.location}</p>}
+                            </div>
+                        )}
 
                         {/* Smart Mapping Targets */}
                         <div>

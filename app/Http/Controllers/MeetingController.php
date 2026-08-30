@@ -64,7 +64,9 @@ class MeetingController extends Controller
             'description'                => 'nullable|string',
             'start_time'                 => 'required|date',
             'end_time'                   => 'required|date|after:start_time',
-'timezone'                   => 'nullable|string|max:64',
+            'timezone'                   => 'nullable|string|max:64',
+            'class_type'                 => 'nullable|string|in:online,offline',
+            'location'                   => 'nullable|string',
             'custom_meet_link'           => 'nullable|url',
             'whatsapp_template'          => 'nullable|string|max:128',
             'send_whatsapp_notification' => 'nullable|boolean',
@@ -79,12 +81,13 @@ class MeetingController extends Controller
         $googleWarning = null;
 
         return DB::transaction(function () use ($validated, $workspaceId, &$googleWarning) {
-            $meetLink      = !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : null;
+            $classType     = $validated['class_type'] ?? 'online';
+            $meetLink      = ($classType === 'online' && !empty($validated['custom_meet_link'])) ? $validated['custom_meet_link'] : null;
             $googleEventId = null;
 
-            // Generate Google Meet Link if Google Integration is connected and no manual link was provided
+            // Generate Google Meet Link ONLY if class_type is online, Google Integration is connected and no manual link was provided
             $googleClient = GoogleClient::resolveForWorkspace($workspaceId);
-            if ($googleClient && empty($meetLink)) {
+            if ($classType === 'online' && $googleClient && empty($meetLink)) {
                 try {
                     $event = $googleClient->createCalendarEvent(
                         'primary',
@@ -121,6 +124,8 @@ class MeetingController extends Controller
                 'start_time'                 => $validated['start_time'],
                 'end_time'                   => $validated['end_time'],
                 'timezone'                   => $validated['timezone'] ?? 'UTC',
+                'class_type'                 => $validated['class_type'] ?? 'online',
+                'location'                   => $validated['location'] ?? null,
                 'google_event_id'            => $googleEventId,
                 'meet_link'                  => $meetLink,
                 'status'                     => 'scheduled',
@@ -214,7 +219,9 @@ class MeetingController extends Controller
             'description'                => 'nullable|string',
             'start_time'                 => 'required|date',
             'end_time'                   => 'required|date|after:start_time',
-'timezone'                   => 'nullable|string|max:64',
+            'timezone'                   => 'nullable|string|max:64',
+            'class_type'                 => 'nullable|string|in:online,offline',
+            'location'                   => 'nullable|string',
             'custom_meet_link'           => 'nullable|url',
             'whatsapp_template'          => 'nullable|string|max:128',
             'send_whatsapp_notification' => 'nullable|boolean',
@@ -231,6 +238,8 @@ class MeetingController extends Controller
                 'start_time'                 => $validated['start_time'],
                 'end_time'                   => $validated['end_time'],
                 'timezone'                   => $validated['timezone'] ?? 'UTC',
+                'class_type'                 => $validated['class_type'] ?? $meeting->class_type ?? 'online',
+                'location'                   => $validated['location'] ?? null,
                 'meet_link'                  => !empty($validated['custom_meet_link']) ? $validated['custom_meet_link'] : $meeting->meet_link,
                 'whatsapp_template'          => $validated['whatsapp_template'] ?? null,
                 'send_whatsapp_notification' => $validated['send_whatsapp_notification'] ?? true,

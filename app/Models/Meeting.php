@@ -13,6 +13,8 @@ class Meeting extends Model
         'start_time',
         'end_time',
         'timezone',
+        'class_type',
+        'location',
         'google_event_id',
         'meet_link',
         'status',

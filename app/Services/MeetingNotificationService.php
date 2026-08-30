@@ -61,6 +61,10 @@ class MeetingNotificationService
 
             try {
                 if ($client) {
+                    $locationOrLink = ($meeting->class_type === 'offline')
+                        ? ('Venue: ' . ($meeting->location ?? 'Offline Venue'))
+                        : ($meeting->meet_link ?? 'TBD');
+
                     // Meta Cloud API — send template with parameters
                     $components = [[
                         'type'       => 'body',
@@ -68,7 +72,7 @@ class MeetingNotificationService
                             ['type' => 'text', 'text' => $contact->first_name ?? $contact->full_name],
                             ['type' => 'text', 'text' => $meeting->title],
                             ['type' => 'text', 'text' => $meeting->start_time->format('d M Y, h:i A')],
-                            ['type' => 'text', 'text' => $meeting->meet_link ?? 'TBD'],
+                            ['type' => 'text', 'text' => $locationOrLink],
                         ],
                     ]];
 
@@ -208,7 +212,7 @@ class MeetingNotificationService
             if ($dbTemplate && !empty($dbTemplate->components)) {
                 $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $contact, $meeting);
             } else {
-                $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink, $qrAccount->workspace_id);
+                $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink, $qrAccount->workspace_id, $meeting->class_type ?? 'online', $meeting->location ?? null);
             }
 
             $payload = [
@@ -253,15 +257,11 @@ class MeetingNotificationService
             $dateTime  = $meeting->start_time->format('d M Y, h:i A');
             $meetLink  = $meeting->meet_link ?? 'TBD';
 
-            $dbTemplate = WhatsappTemplate::where('workspace_id', $qrAccount->workspace_id)
-                ->where('name', $templateName)
-                ->first();
-
-            if ($dbTemplate && !empty($dbTemplate->components)) {
+            $dbTemplate = WhatsappTemplate::where('workspace_id',            if ($dbTemplate && !empty($dbTemplate->components)) {
                 $dummyContact = new Contact(['first_name' => 'Students', 'full_name' => 'Students']);
                 $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting);
             } else {
-                $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink, $qrAccount->workspace_id);
+                $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink, $qrAccount->workspace_id, $meeting->class_type ?? 'online', $meeting->location ?? null);
             }
 
             $payload = [
@@ -296,7 +296,6 @@ class MeetingNotificationService
     }
 
     /**
-    /**
      * Dynamically resolve Organization / Company Name for a workspace from DB settings or Client model.
      */
     private function getOrganizationName(int $workspaceId): string
@@ -326,14 +325,7 @@ class MeetingNotificationService
     }
 
     /**
-     * Render a custom WhatsappTemplate from DB by replacing dynamic variables:
-     * - {{1}} / {{first_name}} / {{name}} -> Student Name
-     * - {{2}} / {{title}} / {{class_title}} -> Class Title
-     * - {{3}} / {{start_time}} / {{date_time}} -> Class Time
-     * - {{4}} / {{meet_link}} / {{link}} -> Google Meet URL
-     * - {{5}} / {{description}} -> Class Description
-     * - {{organization}} / {{organization_name}} / {{company}} / {{brand}} -> Organization Name from DB
-     * - Any contact field or custom attribute (e.g. {{email}}, {{phone}}, {{city}}, {{course}})
+     * Render a custom WhatsappTemplate from DB by replacing dynamic variables
      */
     private function renderCustomDbTemplate(array $components, Contact $contact, Meeting $meeting): array
     {
@@ -343,8 +335,9 @@ class MeetingNotificationService
         $dateTime    = $meeting->start_time->format('d M Y, h:i A');
         $meetLink    = $meeting->meet_link ?? 'TBD';
         $description = $meeting->description ?? '';
+        $location    = $meeting->location ?? '';
 
-        $replaceVars = function (string $text) use ($contact, $firstName, $title, $dateTime, $meetLink, $description, $orgName): string {
+        $replaceVars = function (string $text) use ($contact, $firstName, $title, $dateTime, $meetLink, $description, $orgName, $location): string {
             $replacements = [
                 '{{1}} font'             => $firstName,
                 '{{1}}'                  => $firstName,
@@ -361,6 +354,8 @@ class MeetingNotificationService
                 '{{4}}'                  => $meetLink,
                 '{{meet_link}}'          => $meetLink,
                 '{{link}}'               => $meetLink,
+                '{{location}}'           => $location,
+                '{{venue}}'              => $location,
                 '{{5}}'                  => $description,
                 '{{description}}'        => $description,
                 '{{organization}}'       => $orgName,
@@ -423,8 +418,8 @@ class MeetingNotificationService
             $header = ['type' => 'text', 'text' => "📅 Class Reminder — {$orgName}"];
         }
 
-        // Add Meet Link button if not present in custom template buttons
-        if ($meetLink && $meetLink !== 'TBD' && empty(array_filter($buttons, fn($b) => $b['type'] === 'url'))) {
+        // Add Meet Link button if not present in custom template buttons (for online classes)
+        if ($meeting->class_type !== 'offline' && $meetLink && $meetLink !== 'TBD' && empty(array_filter($buttons, fn($b) => $b['type'] === 'url'))) {
             array_unshift($buttons, ['type' => 'url', 'text' => '🔗 Join Class Now', 'value' => $meetLink]);
         }
 
@@ -439,10 +434,14 @@ class MeetingNotificationService
     /**
      * Built-in dynamic fallback templates for each trigger timing.
      */
-    private function buildDefaultQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink, int $workspaceId = 0): array
+    private function buildDefaultQrTemplateData(string $trigger, string $firstName, string $title, string $dateTime, ?string $meetLink, int $workspaceId = 0, string $classType = 'online', ?string $location = null): array
     {
         $orgName = $workspaceId ? $this->getOrganizationName($workspaceId) : config('app.name', 'Learmy');
         $footer  = "{$orgName} Education Platform";
+
+        $locationOrLinkText = ($classType === 'offline')
+            ? ("📍 *Venue / Location:* " . ($location ?: 'Offline Classroom'))
+            : ($meetLink ? "🔗 *Join:* {$meetLink}" : '');
 
         switch ($trigger) {
             case 'morning':
@@ -451,10 +450,10 @@ class MeetingNotificationService
                         . "Aaj aapki *{$orgName}* class scheduled hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
-                        . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')
+                        . ($locationOrLinkText ? "{$locationOrLinkText}\n" : '')
                         . "\nTime par tayyar rahein! 🎯";
                 $buttons = [];
-                if ($meetLink) {
+                if ($classType === 'online' && $meetLink) {
                     $buttons[] = ['type' => 'url', 'text' => '🔗 Join Link', 'value' => $meetLink];
                 }
                 $buttons[] = ['type' => 'quickReply', 'text' => '👍 Ready Hoon'];
@@ -466,27 +465,27 @@ class MeetingNotificationService
                         . "Aapki *{$orgName}* class bas *15 minute* mein shuru hone wali hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
-                        . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')
-                        . "\nAbhi ready ho jaayein aur join karein! ⚡";
+                        . ($locationOrLinkText ? "{$locationOrLinkText}\n" : '')
+                        . "\nAbhi ready ho jaayein! ⚡";
                 $buttons = [];
-                if ($meetLink) {
+                if ($classType === 'online' && $meetLink) {
                     $buttons[] = ['type' => 'url', 'text' => '🔗 Join Class Now', 'value' => $meetLink];
                 }
-                $buttons[] = ['type' => 'quickReply', 'text' => '🚀 Joining Now'];
+                $buttons[] = ['type' => 'quickReply', 'text' => '🚀 Ready Hoon'];
                 break;
 
             case 'on_start':
-                $header = ['type' => 'text', 'text' => "🔴 Class is LIVE Now — {$orgName}"];
-                $body   = "Namaste *{$firstName}* ji! 🔴 LIVE\n\n"
-                        . "Aapki *{$orgName}* class *LIVE* shuru ho chuki hai!\n\n"
+                $header = ['type' => 'text', 'text' => "🔴 Class is LIVE / Started — {$orgName}"];
+                $body   = "Namaste *{$firstName}* ji! 🔴\n\n"
+                        . "Aapki *{$orgName}* class *shuru ho chuki hai*!\n\n"
                         . "📚 *{$title}*\n"
-                        . ($meetLink ? "🔗 *Join Immediately:* {$meetLink}\n" : '')
-                        . "\nDelay mat karein — abhi join karein! 🚀";
+                        . ($locationOrLinkText ? "{$locationOrLinkText}\n" : '')
+                        . "\nDelay mat karein! 🚀";
                 $buttons = [];
-                if ($meetLink) {
-                    $buttons[] = ['type' => 'url', 'text' => '🚀 Join LIVE Class', 'value' => $meetLink];
+                if ($classType === 'online' && $meetLink) {
+                    $buttons[] = ['type' => 'url', 'text' => '🚀 Join Class', 'value' => $meetLink];
                 }
-                $buttons[] = ['type' => 'quickReply', 'text' => '✅ Joined'];
+                $buttons[] = ['type' => 'quickReply', 'text' => '✅ Attending'];
                 break;
 
             case 'on_create':
@@ -496,11 +495,15 @@ class MeetingNotificationService
                         . "Aapki new *{$orgName}* class schedule ho gayi hai:\n\n"
                         . "📚 *{$title}*\n"
                         . "🕒 *Time:* {$dateTime}\n"
-                        . ($meetLink ? "🔗 *Join:* {$meetLink}\n" : '')
+                        . ($locationOrLinkText ? "{$locationOrLinkText}\n" : '')
                         . "\nPlease calendar mein date mark kar lein! 🗓️";
                 $buttons = [];
-                if ($meetLink) {
+                if ($classType === 'online' && $meetLink) {
                     $buttons[] = ['type' => 'url', 'text' => '🔗 Class Link', 'value' => $meetLink];
+                }
+                $buttons[] = ['type' => 'quickReply', 'text' => '✅ Attend Karunga'];
+                break;
+        }] = ['type' => 'url', 'text' => '🔗 Class Link', 'value' => $meetLink];
                 }
                 $buttons[] = ['type' => 'quickReply', 'text' => '✅ Attend Karunga'];
                 break;

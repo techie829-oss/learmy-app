@@ -8,7 +8,7 @@ import enUS from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {
     Plus, Calendar as CalendarIcon, List, Pencil, Trash2, ExternalLink,
-    Clock, Users, Copy, Check, Video
+    Clock, Users, Copy, Check, Video, MapPin
 } from 'lucide-react';
 
 const locales = { 'en-US': enUS };
@@ -41,10 +41,23 @@ function MeetingListRow({ meeting, onDelete }) {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const isOffline = meeting.class_type === 'offline';
+
     return (
         <tr className="border-b border-neutral-100 dark:border-neutral-700/50 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
             <td className="px-4 py-3.5 min-w-[180px]">
-                <p className="font-semibold text-neutral-900 dark:text-white text-sm">{meeting.title}</p>
+                <div className="flex items-center gap-2">
+                    <p className="font-semibold text-neutral-900 dark:text-white text-sm">{meeting.title}</p>
+                    {isOffline ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                            <MapPin className="h-3 w-3" /> Offline
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            <Video className="h-3 w-3" /> Online
+                        </span>
+                    )}
+                </div>
                 {meeting.description && (
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-1">{meeting.description}</p>
                 )}
@@ -69,7 +82,12 @@ function MeetingListRow({ meeting, onDelete }) {
                 <StatusBadge status={meeting.status} />
             </td>
             <td className="px-4 py-3.5 whitespace-nowrap">
-                {meeting.meet_link ? (
+                {isOffline ? (
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 max-w-[200px] truncate" title={meeting.location ?? 'Offline Venue'}>
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{meeting.location ?? 'Offline Venue'}</span>
+                    </div>
+                ) : meeting.meet_link ? (
                     <div className="flex items-center gap-2">
                         <a
                             href={meeting.meet_link}
