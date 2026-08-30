@@ -208,24 +208,177 @@ class LearmyEnglishWhatsappTemplateSeeder extends Seeder
                         ],
                     ],
                 ],
+            // 9. Offline Class Scheduled Trigger
+            [
+                'name'     => 'offline_class_on_create',
+                'language' => 'en',
+                'category' => 'UTILITY',
+                'status'   => 'PENDING',
+                'components' => [
+                    [
+                        'type'   => 'HEADER',
+                        'format' => 'TEXT',
+                        'text'   => 'Offline Class Scheduled',
+                    ],
+                    [
+                        'type' => 'BODY',
+                        'text' => "Namaste {{1}} ji!\n\nAapki offline class schedule ho gayi hai:\n\n📚 Class: {{2}}\n🕒 Time: {{3}}\n📍 Venue: {{4}}\n\nPlease calendar mein date mark kar lein aur time par classroom aayein! 🗓️",
+                        'example' => [
+                            'body_text' => [
+                                ['Rahul', 'Algebra Ch-3', '26 Aug, 10:00 AM', 'Learmy Institute Room 204'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'FOOTER',
+                        'text' => 'Learmy Education Platform',
+                    ],
+                    [
+                        'type'    => 'BUTTONS',
+                        'buttons' => [
+                            ['type' => 'QUICK_REPLY', 'text' => 'Attend Karunga'],
+                        ],
+                    ],
+                ],
+            ],
+
+            // 10. Offline Class Morning Reminder
+            [
+                'name'     => 'offline_class_morning_reminder',
+                'language' => 'en',
+                'category' => 'UTILITY',
+                'status'   => 'PENDING',
+                'components' => [
+                    [
+                        'type'   => 'HEADER',
+                        'format' => 'TEXT',
+                        'text'   => 'Today Offline Class Reminder',
+                    ],
+                    [
+                        'type' => 'BODY',
+                        'text' => "Namaste {{1}} ji!\n\nAaj aapki offline class scheduled hai:\n\n📚 Class: {{2}}\n🕒 Time: {{3}}\n📍 Venue: {{4}}\n\nTime par tayyar ho kar center pahunchein! 🎯",
+                        'example' => [
+                            'body_text' => [
+                                ['Rahul', 'Algebra Ch-3', 'Today 04:00 PM', 'Learmy Institute Room 204'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'FOOTER',
+                        'text' => 'Learmy Education Platform',
+                    ],
+                    [
+                        'type'    => 'BUTTONS',
+                        'buttons' => [
+                            ['type' => 'QUICK_REPLY', 'text' => 'Ready Hoon'],
+                        ],
+                    ],
+                ],
+            ],
+
+            // 11. Offline Class 15 Mins Before
+            [
+                'name'     => 'offline_class_before_15m',
+                'language' => 'en',
+                'category' => 'UTILITY',
+                'status'   => 'PENDING',
+                'components' => [
+                    [
+                        'type'   => 'HEADER',
+                        'format' => 'TEXT',
+                        'text'   => 'Offline Class in 15 Mins',
+                    ],
+                    [
+                        'type' => 'BODY',
+                        'text' => "Namaste {{1}} ji!\n\nAapki offline class 15 minute mein shuru hone wali hai:\n\n📚 Class: {{2}}\n🕒 Time: {{3}}\n📍 Venue: {{4}}\n\nAbhi classroom mein seat le lein! ⚡",
+                        'example' => [
+                            'body_text' => [
+                                ['Rahul', 'Algebra Ch-3', '04:00 PM', 'Learmy Institute Room 204'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'FOOTER',
+                        'text' => 'Learmy Education Platform',
+                    ],
+                    [
+                        'type'    => 'BUTTONS',
+                        'buttons' => [
+                            ['type' => 'QUICK_REPLY', 'text' => 'On My Way'],
+                        ],
+                    ],
+                ],
+            ],
+
+            // 12. Offline Class On Start
+            [
+                'name'     => 'offline_class_on_start',
+                'language' => 'en',
+                'category' => 'UTILITY',
+                'status'   => 'PENDING',
+                'components' => [
+                    [
+                        'type'   => 'HEADER',
+                        'format' => 'TEXT',
+                        'text'   => 'Offline Class Has Started',
+                    ],
+                    [
+                        'type' => 'BODY',
+                        'text' => "Namaste {{1}} ji!\n\nAapki offline class abhi shuru ho chuki hai:\n\n📚 Class: {{2}}\n📍 Venue: {{4}}\n\nLate na karein — abhi classroom mein aayein! 🚀",
+                        'example' => [
+                            'body_text' => [
+                                ['Rahul', 'Algebra Ch-3', 'Learmy Institute Room 204'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'FOOTER',
+                        'text' => 'Learmy Education Platform',
+                    ],
+                    [
+                        'type'    => 'BUTTONS',
+                        'buttons' => [
+                            ['type' => 'QUICK_REPLY', 'text' => 'Present'],
+                        ],
+                    ],
+                ],
             ],
         ];
 
+        $wabaId = '1414388437341356';
+
         foreach ($workspaceIds as $wsId) {
+            $client = \App\Modules\Whatsapp\Services\CloudApiClient::resolveForWorkspace($wsId);
+
             foreach ($templates as $tplData) {
                 WhatsappTemplate::updateOrCreate(
                     [
                         'workspace_id' => $wsId,
                         'name'         => $tplData['name'],
-                        'language'     => $tplData['language'],
                     ],
                     [
                         'waba_id'     => "workspace_{$wsId}_qr",
                         'category'   => $tplData['category'],
-                        'status'     => $tplData['status'],
+                        'language'   => $tplData['language'] ?? 'en',
+                        'status'     => $tplData['status'] ?? 'PENDING',
                         'components' => $tplData['components'],
                     ]
                 );
+
+                if ($client) {
+                    try {
+                        $metaTpl = [
+                            'name'       => $tplData['name'],
+                            'category'   => $tplData['category'],
+                            'language'   => $tplData['language'] ?? 'en',
+                            'components' => $tplData['components'],
+                        ];
+                        $resp = $client->submitTemplate($wabaId, $metaTpl);
+                        \Log::info("Meta template submitted from seeder: {$tplData['name']}", ['status' => $resp->status(), 'body' => $resp->body()]);
+                    } catch (\Throwable $e) {
+                        \Log::warning("Meta template submission failed for {$tplData['name']}", ['error' => $e->getMessage()]);
+                    }
+                }
             }
         }
     }
