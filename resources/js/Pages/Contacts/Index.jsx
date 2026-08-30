@@ -57,6 +57,17 @@ function ContactRow({ contact, selected, onToggle, onDelete, onEdit }) {
                             {tag.name}
                         </span>
                     ))}
+                    {(!contact.tags || contact.tags.length === 0) && <span className="text-neutral-400 text-xs">—</span>}
+                </div>
+            </td>
+            <td className="px-4 py-3">
+                <div className="flex flex-wrap gap-1">
+                    {contact.segments?.map(seg => (
+                        <span key={seg.id} className="rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 px-2 py-0.5 text-xs font-medium border border-neutral-200 dark:border-neutral-700">
+                            {seg.name}
+                        </span>
+                    ))}
+                    {(!contact.segments || contact.segments.length === 0) && <span className="text-neutral-400 text-xs">—</span>}
                 </div>
             </td>
             <td className="px-4 py-3">
@@ -357,7 +368,7 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                                         }
                                     </button>
                                 </th>
-                                {[t('common.name'), t('contacts_page.col_phone'), t('common.email'), t('contacts_page.col_tags'), t('contacts_page.col_optins'), ''].map(h => (
+                                {[t('common.name'), t('contacts_page.col_phone'), t('common.email'), t('contacts_page.col_tags'), 'Segments', t('contacts_page.col_optins'), ''].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">{h}</th>
                                 ))}
                             </tr>
@@ -375,7 +386,7 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                             ))}
                             {contacts.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={7}>
+                                    <td colSpan={8}>
                                         <EmptyState
                                             icon={<Users className="h-8 w-8" />}
                                             title={t('contacts_page.empty_title')}
