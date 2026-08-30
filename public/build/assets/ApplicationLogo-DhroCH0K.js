@@ -1,0 +1,1 @@
+import{u as t,j as g}from"./app-0w34g80-.js";function i({className:r,style:n,alt:l}){var p;let o=null;try{o=((p=t().props.branding)==null?void 0:p.logo_url)??null}catch{o=null}return o?g.jsx("img",{src:o,alt:l??"App Logo",className:r,style:n}):g.jsx("img",{src:"/logonew.png",alt:l??"App Logo",className:r,style:n})}export{i as A};

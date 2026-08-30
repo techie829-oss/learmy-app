@@ -106,7 +106,7 @@ export default function Groups({ groups = [], tags = [], error = null, connected
                         </div>
                         {!connected && (
                             <Link
-                                href={route('integrations.index')}
+                                href={route('client.integrations.index')}
                                 className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
                             >
                                 <ExternalLink className="h-3 w-3" />

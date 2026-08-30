@@ -13,7 +13,7 @@ export default function NotificationLogs({ logs, stats, filters }) {
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get(route('notification-logs.index'), {
+        router.get(route('client.notification-logs.index'), {
             search,
             status: selectedStatus,
         }, { preserveState: true });
@@ -21,7 +21,7 @@ export default function NotificationLogs({ logs, stats, filters }) {
 
     const handleStatusFilter = (status) => {
         setSelectedStatus(status);
-        router.get(route('notification-logs.index'), {
+        router.get(route('client.notification-logs.index'), {
             search,
             status,
         }, { preserveState: true });

@@ -456,7 +456,7 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
                                             <p className="text-xs text-amber-700 dark:text-amber-400">
                                                 ⚠️ WhatsApp connected nahi hai.{' '}
                                                 <Link
-                                                    href={route('integrations.index')}
+                                                    href={route('client.integrations.index')}
                                                     className="font-semibold underline"
                                                 >
                                                     Integrations mein connect karo
