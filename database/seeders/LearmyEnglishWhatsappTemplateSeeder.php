@@ -208,6 +208,7 @@ class LearmyEnglishWhatsappTemplateSeeder extends Seeder
                         ],
                     ],
                 ],
+            ],
             // 9. Offline Class Scheduled Trigger
             [
                 'name'     => 'offline_class_on_create',
