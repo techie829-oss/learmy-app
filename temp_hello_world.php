@@ -1,37 +1,29 @@
 <?php
 $waba = App\Modules\Whatsapp\Models\WhatsappBusinessAccount::find(1);
-$client = App\Modules\Whatsapp\Services\CloudApiClient::forWorkspace(3);
+$tok = $waba->accessToken();
 
-if (!$client) { echo "No client!\n"; return; }
+// Fetch hello_world specifically
+$r = \Illuminate\Support\Facades\Http::withToken($tok)
+    ->get("https://graph.facebook.com/v20.0/" . $waba->waba_id . "/message_templates", [
+        'name'   => 'hello_world',
+        'fields' => 'name,status,category,language,components',
+        'limit'  => 10,
+    ]);
 
-// Submit hello_world template (Meta's standard sample template - approves instantly)
-$payload = [
-    'name'       => 'hello_world',
-    'language'   => 'en_US',
-    'category'   => 'UTILITY',
-    'components' => [
-        [
-            'type'   => 'HEADER',
-            'format' => 'TEXT',
-            'text'   => 'Hello World',
-        ],
-        [
-            'type' => 'BODY',
-            'text' => 'Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API. Thank you for taking the time to test with us.',
-        ],
-    ],
-];
+echo "hello_world search result:\n";
+print_r($r->json());
 
-echo "Submitting hello_world...\n";
-$resp = $client->submitTemplate($waba->waba_id, $payload);
-if ($resp->successful()) {
-    $id = $resp->json('id');
-    echo "SUCCESS! ID: $id, Status: " . $resp->json('status') . "\n";
+// Also sync it locally if found
+foreach ($r->json('data', []) as $t) {
+    echo "\nFound: " . $t['name'] . " => " . $t['status'] . " (" . ($t['language'] ?? '') . ")\n";
     App\Modules\Whatsapp\Models\WhatsappTemplate::updateOrCreate(
-        ['workspace_id' => 3, 'waba_id' => $waba->waba_id, 'name' => 'hello_world', 'language' => 'en_US'],
-        ['category' => 'UTILITY', 'status' => $resp->json('status','PENDING'), 'components' => $payload['components'], 'meta_template_id' => $id]
+        ['workspace_id' => 3, 'waba_id' => $waba->waba_id, 'name' => $t['name'], 'language' => $t['language'] ?? 'en_US'],
+        [
+            'category'         => $t['category'] ?? 'UTILITY',
+            'status'           => $t['status'] ?? 'APPROVED',
+            'components'       => $t['components'] ?? [],
+            'meta_template_id' => $t['id'] ?? null,
+        ]
     );
-    echo "Saved!\n";
-} else {
-    echo "FAILED: " . json_encode($resp->json()) . "\n";
+    echo "Saved to DB!\n";
 }
