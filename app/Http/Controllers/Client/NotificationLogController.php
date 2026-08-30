@@ -15,7 +15,7 @@ class NotificationLogController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
         $query = NotificationLog::where('workspace_id', $workspaceId)
-            ->with(['contact:id,full_name,first_name,phone_e164', 'meeting:id,title']);
+            ->with(['contact:id,first_name,last_name,phone_e164', 'meeting:id,title']);
 
         if ($request->filled('status') && in_array($request->status, ['sent', 'failed', 'delivered'], true)) {
             $query->where('status', $request->status);
@@ -36,7 +36,7 @@ class NotificationLogController extends Controller
             ->through(fn (NotificationLog $log) => [
                 'id'            => $log->id,
                 'phone'         => $log->phone,
-                'contact_name'  => $log->contact ? ($log->contact->full_name ?? $log->contact->first_name) : null,
+                'contact_name'  => $log->contact ? (trim(($log->contact->first_name ?? '') . ' ' . ($log->contact->last_name ?? '')) ?: null) : null,
                 'meeting_title' => $log->meeting ? $log->meeting->title : null,
                 'trigger'       => $log->trigger,
                 'channel'       => $log->channel,
