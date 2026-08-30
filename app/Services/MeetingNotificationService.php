@@ -257,7 +257,11 @@ class MeetingNotificationService
             $dateTime  = $meeting->start_time->format('d M Y, h:i A');
             $meetLink  = $meeting->meet_link ?? 'TBD';
 
-            $dbTemplate = WhatsappTemplate::where('workspace_id',            if ($dbTemplate && !empty($dbTemplate->components)) {
+            $dbTemplate = WhatsappTemplate::where('workspace_id', $qrAccount->workspace_id)
+                ->where('name', $templateName)
+                ->first();
+
+            if ($dbTemplate && !empty($dbTemplate->components)) {
                 $dummyContact = new Contact(['first_name' => 'Students', 'full_name' => 'Students']);
                 $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting);
             } else {
@@ -500,10 +504,6 @@ class MeetingNotificationService
                 $buttons = [];
                 if ($classType === 'online' && $meetLink) {
                     $buttons[] = ['type' => 'url', 'text' => '🔗 Class Link', 'value' => $meetLink];
-                }
-                $buttons[] = ['type' => 'quickReply', 'text' => '✅ Attend Karunga'];
-                break;
-        }] = ['type' => 'url', 'text' => '🔗 Class Link', 'value' => $meetLink];
                 }
                 $buttons[] = ['type' => 'quickReply', 'text' => '✅ Attend Karunga'];
                 break;
