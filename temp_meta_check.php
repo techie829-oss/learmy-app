@@ -1,7 +1,7 @@
 <?php
 $waba = App\Modules\Whatsapp\Models\WhatsappBusinessAccount::find(1);
 $workspace = App\Models\Workspace::find(3);
-$tok = App\Modules\Integrations\Services\CredentialResolver::for($workspace)->meta()->accessToken();
+$tok = App\Modules\Integrations\Services\CredentialResolver::for($workspace)->meta()->systemUserToken();
 
 // Step 1: List all templates on Meta (including hello_world)
 $r = \Illuminate\Support\Facades\Http::withToken($tok)
