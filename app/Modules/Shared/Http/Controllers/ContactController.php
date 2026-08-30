@@ -105,7 +105,12 @@ class ContactController extends Controller
             'opt_in_email' => ['boolean'],
             'segment_ids' => ['nullable', 'array'],
             'segment_ids.*' => ['integer', Rule::exists('segments', 'id')->where(fn ($q) => $q->where('workspace_id', $workspaceId)->where('type', 'static'))],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', Rule::exists('contact_tags', 'id')->where('workspace_id', $workspaceId)],
         ]);
+
+        $tagIds = $validated['tag_ids'] ?? [];
+        unset($validated['tag_ids']);
 
         $segmentIds = $validated['segment_ids'] ?? [];
         unset($validated['segment_ids']);
@@ -115,6 +120,10 @@ class ContactController extends Controller
         if ($segmentIds) {
             $contact->segments()->syncWithoutDetaching($segmentIds);
             Segment::whereIn('id', $segmentIds)->each(fn ($s) => $s->update(['contact_count' => $s->contacts()->count()]));
+        }
+
+        if ($tagIds) {
+            $contact->tags()->syncWithoutDetaching($tagIds);
         }
 
         return back()->with('success', 'Contact saved.');
@@ -136,7 +145,12 @@ class ContactController extends Controller
             'custom_fields' => ['nullable', 'array'],
             'segment_ids' => ['nullable', 'array'],
             'segment_ids.*' => ['integer', Rule::exists('segments', 'id')->where(fn ($q) => $q->where('workspace_id', $workspaceId)->where('type', 'static'))],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', Rule::exists('contact_tags', 'id')->where('workspace_id', $workspaceId)],
         ]);
+
+        $tagIds = $validated['tag_ids'] ?? null;
+        unset($validated['tag_ids']);
 
         $segmentIds = $validated['segment_ids'] ?? null;
         unset($validated['segment_ids']);
@@ -148,6 +162,10 @@ class ContactController extends Controller
             $contact->segments()->sync($segmentIds);
             $affectedIds = array_unique(array_merge($oldSegmentIds, $segmentIds));
             Segment::whereIn('id', $affectedIds)->each(fn ($s) => $s->update(['contact_count' => $s->contacts()->count()]));
+        }
+
+        if ($tagIds !== null) {
+            $contact->tags()->sync($tagIds);
         }
 
         return back()->with('success', 'Contact updated.');
@@ -324,5 +342,32 @@ class ContactController extends Controller
     {
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
         abort_unless((int) $contact->workspace_id === (int) $workspaceId, 403);
+    }
+
+    public function storeTag(Request $request): RedirectResponse
+    {
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:64'],
+            'color' => ['nullable', 'string', 'max:7', 'regex:/^#[0-9A-F]{6}$/i'],
+        ]);
+
+        ContactTag::create(array_merge($validated, [
+            'workspace_id' => $workspaceId,
+            'color' => $validated['color'] ?? '#6366F1'
+        ]));
+
+        return back()->with('success', 'Tag created successfully.');
+    }
+
+    public function destroyTag(Request $request, ContactTag $tag): RedirectResponse
+    {
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
+        abort_unless((int) $tag->workspace_id === (int) $workspaceId, 403);
+
+        $tag->contacts()->detach();
+        $tag->delete();
+
+        return back()->with('success', 'Tag deleted successfully.');
     }
 }

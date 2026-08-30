@@ -19,6 +19,10 @@ Route::middleware(['web', 'client-app'])->prefix('app')->name('client.')->group(
     Route::post('/contacts/{contact}/avatar', [ContactController::class, 'uploadAvatar'])->name('contacts.avatar.upload');
     Route::delete('/contacts/{contact}/avatar', [ContactController::class, 'deleteAvatar'])->name('contacts.avatar.delete');
 
+    // Tags
+    Route::post('/tags', [ContactController::class, 'storeTag'])->name('tags.store');
+    Route::delete('/tags/{tag}', [ContactController::class, 'destroyTag'])->name('tags.destroy');
+
     // Segments
     Route::get('/segments', [SegmentController::class, 'index'])->name('segments.index');
     Route::post('/segments', [SegmentController::class, 'store'])->name('segments.store');

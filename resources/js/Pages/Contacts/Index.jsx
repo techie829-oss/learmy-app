@@ -117,11 +117,17 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
     const [selected, setSelected] = useState(new Set());
     const fileInput = useRef();
 
+    const [showTagsModal, setShowTagsModal] = useState(false);
+    const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState('#6366F1');
+    const [creatingTag, setCreatingTag] = useState(false);
+
     // ── Add contact form ────────────────────────────────────────────────
     const { data, setData, post, processing, reset } = useForm({
         first_name: '', last_name: '', phone_e164: '', email: '',
         opt_in_whatsapp: true, opt_in_sms: true, opt_in_email: true,
         segment_ids: [],
+        tag_ids: [],
     });
 
     // ── Edit contact form ────────────────────────────────────────────────
@@ -134,6 +140,7 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
         opt_in_sms: true,
         opt_in_email: true,
         segment_ids: [],
+        tag_ids: [],
     });
 
     const openEditModal = (contact) => {
@@ -147,6 +154,31 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
             opt_in_sms: contact.opt_in_sms ?? true,
             opt_in_email: contact.opt_in_email ?? true,
             segment_ids: (contact.segments ?? []).map(s => s.id),
+            tag_ids: (contact.tags ?? []).map(t => t.id),
+        });
+    };
+
+    const handleCreateTag = (e) => {
+        e.preventDefault();
+        setCreatingTag(true);
+        router.post(route('client.tags.store'), {
+            name: newTagName,
+            color: newTagColor,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setNewTagName('');
+                setNewTagColor('#6366F1');
+                setCreatingTag(false);
+            },
+            onError: () => setCreatingTag(false),
+        });
+    };
+
+    const handleDeleteTag = (id) => {
+        if (!confirm('Are you sure you want to delete this tag? This will remove the tag from all contacts.')) return;
+        router.delete(route('client.tags.destroy', id), {
+            preserveScroll: true,
         });
     };
 
@@ -272,6 +304,13 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                         <Link href={route('client.segments.index')} className="flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition">
                             <Tag className="h-4 w-4" /> {t('contacts_page.segments')}
                         </Link>
+                        <button
+                            type="button"
+                            onClick={() => setShowTagsModal(true)}
+                            className="flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                        >
+                            <Tag className="h-4 w-4" /> Manage Tags
+                        </button>
                         {(
                             <button type="button" onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition">
                                 <UserPlus className="h-4 w-4" /> {t('contacts_page.add_contact')}
@@ -462,6 +501,26 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                                     </div>
                                 </div>
                             )}
+                            {tags.length > 0 && (
+                                <div>
+                                    <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Batches (Tags)</label>
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                        {tags.map(tag => {
+                                            const checked = data.tag_ids.includes(tag.id);
+                                            return (
+                                                <label key={tag.id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs cursor-pointer transition ${checked ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300' : 'border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-brand-400'}`}>
+                                                    <input type="checkbox" className="sr-only" checked={checked} onChange={() => {
+                                                        const ids = checked ? data.tag_ids.filter(id => id !== tag.id) : [...data.tag_ids, tag.id];
+                                                        setData('tag_ids', ids);
+                                                    }} />
+                                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                                    {tag.name}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-2 pt-2">
                                 <button type="submit" disabled={processing} className="flex-1 rounded-lg bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 transition">
                                     {processing ? t('common.saving') : t('common.save')}
@@ -582,6 +641,27 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                                     </div>
                                 </div>
                             )}
+                            {/* Tags Selection */}
+                            {tags.length > 0 && (
+                                <div>
+                                    <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Batches (Tags)</label>
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                        {tags.map(tag => {
+                                            const checked = editData.tag_ids?.includes(tag.id);
+                                            return (
+                                                <label key={tag.id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs cursor-pointer transition ${checked ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300' : 'border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-brand-400'}`}>
+                                                    <input type="checkbox" className="sr-only" checked={checked} onChange={() => {
+                                                        const ids = checked ? editData.tag_ids.filter(id => id !== tag.id) : [...(editData.tag_ids ?? []), tag.id];
+                                                        setEditData('tag_ids', ids);
+                                                    }} />
+                                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                                    {tag.name}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
@@ -601,6 +681,68 @@ export default function ContactsIndex({ contacts, filters, segments = [], tags =
                                     Cancel
                                 </button>
                             </div>
+                        </form>
+                    </div>
+                </div>
+            {/* ── Manage Tags Modal ────────────────────────────────────────── */}
+            {showTagsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl space-y-4 max-h-[85vh] flex flex-col">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Manage Tags</h3>
+                            <button type="button" onClick={() => setShowTagsModal(false)} className="text-neutral-400 hover:text-neutral-600">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Tag list */}
+                        <div className="flex-1 overflow-y-auto space-y-2 max-h-[40vh] pr-1">
+                            {tags.length === 0 && (
+                                <p className="text-sm text-neutral-500 text-center py-4">No tags created yet.</p>
+                            )}
+                            {tags.map(tag => (
+                                <div key={tag.id} className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800 border">
+                                    <span className="flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-200">
+                                        <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                        {tag.name}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteTag(tag.id)}
+                                        className="p-1 text-neutral-400 hover:text-red-500 rounded transition"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Add tag form */}
+                        <form onSubmit={handleCreateTag} className="border-t pt-3 space-y-3">
+                            <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Create New Tag</h4>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Tag Name (e.g. VIP, Morning Batch)"
+                                    value={newTagName}
+                                    onChange={e => setNewTagName(e.target.value)}
+                                    required
+                                    className="flex-1 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-1.5 text-sm"
+                                />
+                                <input
+                                    type="color"
+                                    value={newTagColor}
+                                    onChange={e => setNewTagColor(e.target.value)}
+                                    className="w-10 h-9 p-0.5 rounded border border-neutral-300 dark:border-neutral-600 cursor-pointer"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={creatingTag}
+                                className="w-full rounded-lg bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 transition"
+                            >
+                                {creatingTag ? 'Creating...' : 'Create Tag'}
+                            </button>
                         </form>
                     </div>
                 </div>
