@@ -14,10 +14,45 @@ class WhatsappAutoReplyController extends Controller
 {
     public function index(Request $request): Response
     {
-        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
+        $user = $request->user();
+        $workspaceId = $user->current_workspace_id ?? $user->workspace_id;
         $rules = WhatsappAutoReply::where('workspace_id', $workspaceId)->orderBy('priority')->get();
 
-        return Inertia::render('Whatsapp/AutoReplies/Index', ['rules' => $rules]);
+        $globalEnabled = $user->client_id ? (\App\Models\ClientSetting::get($user->client_id, 'auto_reply_global_enabled', '1') !== '0') : true;
+
+        return Inertia::render('Whatsapp/AutoReplies/Index', [
+            'rules' => $rules,
+            'global_enabled' => $globalEnabled,
+        ]);
+    }
+
+    public function toggleGlobal(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        if ($user->client_id) {
+            \App\Models\ClientSetting::set($user->client_id, 'auto_reply_global_enabled', $validated['enabled'] ? '1' : '0');
+        }
+
+        $statusStr = $validated['enabled'] ? 'enabled' : 'disabled';
+        return back()->with('success', "Global Auto-reply engine has been {$statusStr}.");
+    }
+
+    public function toggleAll(Request $request): RedirectResponse
+    {
+        $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        WhatsappAutoReply::where('workspace_id', $workspaceId)
+            ->update(['enabled' => $validated['enabled']]);
+
+        $statusStr = $validated['enabled'] ? 'enabled' : 'disabled';
+        return back()->with('success', "All auto-reply rules have been {$statusStr}.");
     }
 
     public function store(Request $request): RedirectResponse

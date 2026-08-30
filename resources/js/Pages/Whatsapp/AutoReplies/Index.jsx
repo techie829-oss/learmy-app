@@ -216,7 +216,7 @@ function RuleForm({ data, setData, errors, onSubmit, onCancel, processing, submi
     );
 }
 
-export default function WhatsappAutoRepliesIndex({ rules }) {
+export default function WhatsappAutoRepliesIndex({ rules, global_enabled = true }) {
     const { t } = useTranslation();
     const { props } = usePage();
     const flash = props.flash ?? {};
@@ -265,6 +265,22 @@ export default function WhatsappAutoRepliesIndex({ rules }) {
         );
     };
 
+    const handleToggleGlobal = (enabledState) => {
+        router.post(
+            route('client.whatsapp.auto-replies.toggle-global'),
+            { enabled: enabledState },
+            { preserveScroll: true }
+        );
+    };
+
+    const handleToggleAll = (enabledState) => {
+        router.post(
+            route('client.whatsapp.auto-replies.toggle-all'),
+            { enabled: enabledState },
+            { preserveScroll: true }
+        );
+    };
+
     const handleDelete = (id) => {
         if (confirm(t('whatsapp.auto_replies_delete_confirm'))) {
             router.delete(route('client.whatsapp.auto-replies.destroy', id), { preserveScroll: true });
@@ -290,6 +306,71 @@ export default function WhatsappAutoRepliesIndex({ rules }) {
                             <Plus className="h-4 w-4" /> {t('whatsapp.auto_replies_add_rule')}
                         </button>
                     )}
+                </div>
+
+                {/* Master Auto-Reply Status Banner */}
+                <div className={`rounded-xl border p-4 transition ${
+                    global_enabled
+                        ? 'border-green-200 bg-green-50/50 dark:border-green-800/40 dark:bg-green-900/10'
+                        : 'border-red-200 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10'
+                }`}>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                                global_enabled ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                            }`}>
+                                <Zap className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                                        Auto-Reply Master Switch
+                                    </h3>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        global_enabled
+                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                            : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                    }`}>
+                                        {global_enabled ? '🟢 TURNED ON (ACTIVE)' : '🔴 TURNED OFF (PAUSED)'}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                                    {global_enabled
+                                        ? 'System incoming messages ka automated WhatsApp replies bhej raha hai.'
+                                        : 'System ke saare automated WhatsApp replies paused hain. Koi auto-message nahi jayega.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => handleToggleGlobal(!global_enabled)}
+                                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition shadow-sm ${
+                                    global_enabled
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'bg-green-600 text-white hover:bg-green-700'
+                                }`}
+                            >
+                                {global_enabled ? '🔴 Turn OFF Auto-Replies' : '🟢 Turn ON Auto-Replies'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleToggleAll(false)}
+                                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition"
+                            >
+                                Pause All Rules
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleToggleAll(true)}
+                                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition"
+                            >
+                                Enable All Rules
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {flash.success && (

@@ -97,6 +97,19 @@ class AutoReplyListener
             return;
         }
 
+        // ── Security Guard: Master Global Auto-Reply Switch ────────────────
+        $workspaceId = $conversation->workspace_id;
+        if ($workspaceId) {
+            $workspace = \App\Models\Workspace::find($workspaceId);
+            if ($workspace && $workspace->client_id) {
+                $globalEnabled = \App\Models\ClientSetting::get($workspace->client_id, 'auto_reply_global_enabled', '1');
+                if ($globalEnabled === '0') {
+                    Log::info('AutoReplyListener: Auto-replies turned OFF globally by user', ['workspace_id' => $workspaceId]);
+                    return;
+                }
+            }
+        }
+
         // ── Security Guard 5: Per-conversation auto-reply rate limit ──────────
         // Max 10 auto-replies per conversation per hour to prevent spam abuse.
         // If a contact keeps sending messages, we stop auto-replying after 10.

@@ -40,6 +40,8 @@ Route::middleware(['web', 'client-app'])->prefix('app/whatsapp')->name('client.w
     // Auto-replies
     Route::get('/auto-replies', [WhatsappAutoReplyController::class, 'index'])->name('auto-replies.index');
     Route::post('/auto-replies', [WhatsappAutoReplyController::class, 'store'])->name('auto-replies.store');
+    Route::post('/auto-replies/toggle-global', [WhatsappAutoReplyController::class, 'toggleGlobal'])->name('auto-replies.toggle-global');
+    Route::post('/auto-replies/toggle-all', [WhatsappAutoReplyController::class, 'toggleAll'])->name('auto-replies.toggle-all');
     Route::put('/auto-replies/{autoReply}', [WhatsappAutoReplyController::class, 'update'])->name('auto-replies.update');
     Route::delete('/auto-replies/{autoReply}', [WhatsappAutoReplyController::class, 'destroy'])->name('auto-replies.destroy');
 
