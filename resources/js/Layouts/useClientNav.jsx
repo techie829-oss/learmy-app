@@ -4,7 +4,7 @@ import { ChannelBrandIcon } from '@/Components/BrandIcons';
 import {
     LayoutDashboard, CreditCard, Package, FileText, Users, Settings,
     Layers, Webhook, Key, BookOpen, Image, Radio, Inbox, Bot, Database,
-    Zap, Share2, MapPin, Tag, LifeBuoy, ExternalLink, Mail, MessageSquare, Calendar
+    Zap, Share2, MapPin, Tag, LifeBuoy, ExternalLink, Mail, MessageSquare, Calendar, Activity
 } from 'lucide-react';
 
 const iconClass = 'h-4 w-4';
@@ -73,6 +73,7 @@ export default function useClientNav() {
         { label: t('nav.templates'),     href: safeRoute('client.whatsapp.templates.index'),     icon: whatsappNavIcon, activePattern: 'client.whatsapp.templates.*' },
         { label: t('nav.auto_replies'),  href: safeRoute('client.whatsapp.auto-replies.index'),  icon: whatsappNavIcon, activePattern: 'client.whatsapp.auto-replies.*' },
         { label: t('nav.chat_widget'),   href: safeRoute('client.whatsapp.widget.index'),         icon: whatsappNavIcon, activePattern: 'client.whatsapp.widget.*' },
+        { label: 'Notification Logs',    href: safeRoute('notification-logs.index'),             icon: <Activity className={iconClass} />, activePattern: 'notification-logs.*' },
     ];
 
     const broadcastItems = [

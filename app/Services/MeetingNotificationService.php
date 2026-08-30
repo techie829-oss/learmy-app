@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Meeting;
+use App\Models\NotificationLog;
 use App\Modules\Shared\Models\ChannelAccount;
 use App\Modules\Shared\Models\Contact;
 use App\Modules\Shared\Models\ContactTag;
@@ -75,12 +76,37 @@ class MeetingNotificationService
 
                     if ($response->successful()) {
                         $sentCount++;
+                        NotificationLog::create([
+                            'workspace_id'  => $workspaceId,
+                            'meeting_id'    => $meeting->id,
+                            'contact_id'    => $contact->id,
+                            'phone'         => $contact->phone_e164,
+                            'trigger'       => $trigger,
+                            'channel'       => 'whatsapp',
+                            'provider'      => 'meta',
+                            'template_name' => $templateName,
+                            'status'        => 'sent',
+                        ]);
                     } else {
+                        $errBody = $response->body();
                         Log::warning('[MeetingNotification] Meta template failed, trying QR fallback.', [
                             'phone'   => $contact->phone_e164,
                             'trigger' => $trigger,
-                            'error'   => $response->body(),
+                            'error'   => $errBody,
                         ]);
+                        NotificationLog::create([
+                            'workspace_id'  => $workspaceId,
+                            'meeting_id'    => $meeting->id,
+                            'contact_id'    => $contact->id,
+                            'phone'         => $contact->phone_e164,
+                            'trigger'       => $trigger,
+                            'channel'       => 'whatsapp',
+                            'provider'      => 'meta',
+                            'template_name' => $templateName,
+                            'status'        => 'failed',
+                            'error_message' => $errBody,
+                        ]);
+
                         if ($qrAccount) {
                             $sentCount += $this->sendViaQr($qrAccount, $contact, $meeting, $trigger, $templateName);
                         }
@@ -93,6 +119,18 @@ class MeetingNotificationService
                     'phone'   => $contact->phone_e164,
                     'trigger' => $trigger,
                     'error'   => $e->getMessage(),
+                ]);
+                NotificationLog::create([
+                    'workspace_id'  => $workspaceId,
+                    'meeting_id'    => $meeting->id,
+                    'contact_id'    => $contact->id,
+                    'phone'         => $contact->phone_e164,
+                    'trigger'       => $trigger,
+                    'channel'       => 'whatsapp',
+                    'provider'      => 'meta',
+                    'template_name' => $templateName,
+                    'status'        => 'failed',
+                    'error_message' => $e->getMessage(),
                 ]);
             }
         }

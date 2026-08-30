@@ -318,7 +318,7 @@ class WhatsappDriver implements ChannelDriverInterface
             'status' => 'delivered',
             'provider_message_id' => $msg['id'] ?? null,
             'sent_by' => 'human',
-            'sent_at' => now()->createFromTimestamp($msg['timestamp'] ?? time()),
+            'sent_at' => \Carbon\Carbon::createFromTimestampUTC($msg['timestamp'] ?? time())->setTimezone(config('app.timezone', 'Asia/Kolkata')),
         ]);
 
         $conversation->update([

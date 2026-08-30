@@ -13,6 +13,7 @@ use App\Http\Controllers\Client\DashboardController as ClientDashboardController
 use App\Http\Controllers\Client\InvitationController;
 use App\Http\Controllers\Client\MediaController;
 use App\Http\Controllers\Client\NotificationController;
+use App\Http\Controllers\Client\NotificationLogController;
 use App\Http\Controllers\Client\OnboardingController;
 use App\Http\Controllers\Client\SearchController;
 use App\Http\Controllers\Client\Settings\DataExportController;
@@ -92,6 +93,9 @@ Route::middleware(['verified'])->group(function () {
 
     // Audit log (client admins only)
     Route::get('/audit-log', [ClientAuditLogController::class, 'index'])->name('audit-log.index');
+
+    // Notification logs (WhatsApp & Meeting triggers)
+    Route::get('/notification-logs', [NotificationLogController::class, 'index'])->name('notification-logs.index');
 
     // Settings
     Route::get('/settings', [ClientSettingsController::class, 'index'])->name('settings.index');
