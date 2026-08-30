@@ -70,7 +70,17 @@ class Meeting extends Model
             return $settings[$trigger]['template'];
         }
 
-        // Fallback to legacy single template field or default
+        if ($this->class_type === 'offline') {
+            $offlineMap = [
+                'on_create'  => 'offline_class_on_create',
+                'morning'    => 'offline_class_morning_reminder',
+                'before_15m' => 'offline_class_before_15m',
+                'on_start'   => 'offline_class_on_start',
+            ];
+            return $offlineMap[$trigger] ?? "offline_class_{$trigger}";
+        }
+
+        // Fallback to legacy single template field or default online template
         return $this->whatsapp_template ?: "class_{$trigger}_reminder";
     }
 }
