@@ -401,11 +401,11 @@ class MeetingController extends Controller
     {
         try {
             $templates = WhatsappTemplate::where('workspace_id', $workspaceId)
-                ->where('status', 'APPROVED')
-                ->get(['id', 'name', 'language', 'category'])
+                ->whereIn('status', ['APPROVED', 'PENDING'])
+                ->get(['id', 'name', 'language', 'category', 'status'])
                 ->map(fn($t) => [
                     'value' => $t->name,
-                    'label' => "{$t->name} (" . ucfirst(strtolower($t->category)) . ' • ' . strtoupper($t->language) . ')',
+                    'label' => "{$t->name} (" . ucfirst(strtolower($t->category)) . ' • ' . strtoupper($t->language) . ($t->status === 'PENDING' ? ' • Pending Review' : '') . ')',
                 ])
                 ->toArray();
 
