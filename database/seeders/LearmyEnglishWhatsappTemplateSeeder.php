@@ -349,7 +349,7 @@ class LearmyEnglishWhatsappTemplateSeeder extends Seeder
         $wabaId = '1414388437341356';
 
         foreach ($workspaceIds as $wsId) {
-            $client = \App\Modules\Whatsapp\Services\CloudApiClient::resolveForWorkspace($wsId);
+            $client = \App\Modules\Whatsapp\Services\CloudApiClient::forWorkspace($wsId);
 
             foreach ($templates as $tplData) {
                 WhatsappTemplate::updateOrCreate(
