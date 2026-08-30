@@ -1,29 +1,23 @@
 <?php
 $waba = App\Modules\Whatsapp\Models\WhatsappBusinessAccount::find(1);
-$tok = $waba->accessToken();
+$client = App\Modules\Whatsapp\Services\CloudApiClient::forWorkspace(3);
 
-// Fetch hello_world specifically
+if (!$client) { echo "No client!\n"; return; }
+
+// Check demo_class_notification status on Meta directly
+$tok = $waba->accessToken();
 $r = \Illuminate\Support\Facades\Http::withToken($tok)
     ->get("https://graph.facebook.com/v20.0/" . $waba->waba_id . "/message_templates", [
-        'name'   => 'hello_world',
-        'fields' => 'name,status,category,language,components',
-        'limit'  => 10,
+        'fields' => 'name,status,category,language',
+        'limit'  => 50,
     ]);
 
-echo "hello_world search result:\n";
-print_r($r->json());
-
-// Also sync it locally if found
+echo "=== Current Meta Template Statuses ===\n";
+$approved = [];
 foreach ($r->json('data', []) as $t) {
-    echo "\nFound: " . $t['name'] . " => " . $t['status'] . " (" . ($t['language'] ?? '') . ")\n";
-    App\Modules\Whatsapp\Models\WhatsappTemplate::updateOrCreate(
-        ['workspace_id' => 3, 'waba_id' => $waba->waba_id, 'name' => $t['name'], 'language' => $t['language'] ?? 'en_US'],
-        [
-            'category'         => $t['category'] ?? 'UTILITY',
-            'status'           => $t['status'] ?? 'APPROVED',
-            'components'       => $t['components'] ?? [],
-            'meta_template_id' => $t['id'] ?? null,
-        ]
-    );
-    echo "Saved to DB!\n";
+    echo $t['name'] . " [" . ($t['language'] ?? '') . "] => " . $t['status'] . "\n";
+    if ($t['status'] === 'APPROVED') {
+        $approved[] = $t['name'];
+    }
 }
+echo "\nAPPROVED: " . (count($approved) ? implode(', ', $approved) : 'NONE') . "\n";
