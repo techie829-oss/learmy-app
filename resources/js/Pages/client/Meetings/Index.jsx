@@ -139,17 +139,18 @@ function MeetingListRow({ meeting, onDelete }) {
     );
 }
 
-export default function Index({ meetings }) {
+export default function Index({ meetings = [] }) {
+    const meetingList = Array.isArray(meetings) ? meetings : (meetings?.data ?? []);
     const [view, setView] = useState('list');
     const [confirmDelete, setConfirmDelete] = useState(null);
     const { props } = usePage();
     const flash = props.flash ?? {};
 
-    const events = meetings.map(m => ({
-        id: m.id,
-        title: m.title,
-        start: new Date(m.start_time),
-        end:   new Date(m.end_time),
+    const events = (meetingList || []).map(m => ({
+        id: m?.id,
+        title: m?.title ?? 'Class',
+        start: m?.start_time ? new Date(m.start_time) : new Date(),
+        end:   m?.end_time ? new Date(m.end_time) : new Date(),
         resource: m,
     }));
 

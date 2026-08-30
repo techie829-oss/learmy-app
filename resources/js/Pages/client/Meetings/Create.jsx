@@ -6,8 +6,12 @@ import { ArrowLeft, Video, CheckCircle2, MessageSquare, ExternalLink, Clock, Sun
 export default function Create({ tags = [], segments = [], waGroups = [], workspace_id, meeting, waTemplates = [], whatsappConnected = false }) {
     const isEdit = !!meeting;
 
-    const initialTargets = isEdit
-        ? (meeting.targets ?? []).map(t => ({ type: t.target_type, id: t.target_id }))
+    const safeTags     = Array.isArray(tags) ? tags : [];
+    const safeSegments = Array.isArray(segments) ? segments : [];
+    const safeWaGroups = Array.isArray(waGroups) ? waGroups : [];
+
+    const initialTargets = isEdit && meeting && Array.isArray(meeting.targets)
+        ? meeting.targets.map(t => ({ type: t.target_type, id: t.target_id }))
         : [];
 
     const defaultReminders = {
@@ -17,7 +21,7 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
         on_start:   { enabled: true,  template: '' },
     };
 
-    const initialReminders = isEdit && meeting.reminder_settings
+    const initialReminders = isEdit && meeting && meeting.reminder_settings
         ? { ...defaultReminders, ...meeting.reminder_settings }
         : defaultReminders;
 
@@ -30,17 +34,17 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
 
     const { data, setData, post, put, processing, errors } = useForm({
         workspace_id:                workspace_id,
-        title:                       isEdit ? meeting.title : '',
-        description:                 isEdit ? (meeting.description ?? '') : '',
-        class_type:                  isEdit ? (meeting.class_type || 'online') : 'online',
-        location:                    isEdit ? (meeting.location ?? '') : '',
-        start_time:                  isEdit ? meeting.start_time?.slice(0, 16) : getLocalDatetime(1),
-        end_time:                    isEdit ? meeting.end_time?.slice(0, 16) : getLocalDatetime(2),
-        timezone:                    isEdit ? (meeting.timezone || 'Asia/Kolkata') : (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata' : 'Asia/Kolkata'),
-        custom_meet_link:            isEdit ? (meeting.meet_link ?? '') : '',
+        title:                       isEdit && meeting ? meeting.title : '',
+        description:                 isEdit && meeting ? (meeting.description ?? '') : '',
+        class_type:                  isEdit && meeting ? (meeting.class_type || 'online') : 'online',
+        location:                    isEdit && meeting ? (meeting.location ?? '') : '',
+        start_time:                  isEdit && meeting && meeting.start_time ? meeting.start_time.slice(0, 16) : getLocalDatetime(1),
+        end_time:                    isEdit && meeting && meeting.end_time ? meeting.end_time.slice(0, 16) : getLocalDatetime(2),
+        timezone:                    isEdit && meeting ? (meeting.timezone || 'Asia/Kolkata') : (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata' : 'Asia/Kolkata'),
+        custom_meet_link:            isEdit && meeting ? (meeting.meet_link ?? '') : '',
         targets:                     initialTargets,
-        whatsapp_template:           isEdit ? (meeting.whatsapp_template ?? '') : '',
-        send_whatsapp_notification:  isEdit ? (meeting.send_whatsapp_notification ?? true) : true,
+        whatsapp_template:           isEdit && meeting ? (meeting.whatsapp_template ?? '') : '',
+        send_whatsapp_notification:  isEdit && meeting ? (meeting.send_whatsapp_notification ?? true) : true,
         reminder_settings:           initialReminders,
     });
 
@@ -95,14 +99,14 @@ export default function Create({ tags = [], segments = [], waGroups = [], worksp
             return `💬 ${target.name || target.id}`;
         }
         if (typeof target.type === 'string' && target.type.includes('ContactTag')) {
-            const tag = tags.find(t => t.id === target.id);
-            return `🏷️ Batch: ${tag ? tag.name : 'Unknown'}`;
+            const tag = safeTags.find(t => t.id === target.id || t.id === Number(target.id));
+            return `🏷️ Batch: ${tag ? tag.name : 'Tag #' + target.id}`;
         }
         if (typeof target.type === 'string' && target.type.includes('Segment')) {
-            const seg = segments.find(s => s.id === target.id);
-            return `📂 Segment: ${seg ? seg.name : 'Unknown'}`;
+            const segment = safeSegments.find(s => s.id === target.id || s.id === Number(target.id));
+            return `⚡ Segment: ${segment ? segment.name : 'Segment #' + target.id}`;
         }
-        return 'Unknown Target';
+        return `Target #${target.id}`;
     };
 
     const updateReminderSetting = (trigger, key, value) => {
