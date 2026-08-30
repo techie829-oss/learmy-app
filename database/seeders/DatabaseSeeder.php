@@ -30,9 +30,9 @@ class DatabaseSeeder extends Seeder
             // LandingPageSeeder::class,
             // CmsPageSeeder::class,
 
-            // Comprehensive demo content: one fully-populated client
-            // (SpaGreen Wellness) across every module, plus light secondaries.
-            // DemoSeeder::class,
+            // Comprehensive demo content & WhatsApp templates:
+            LearmyEnglishWhatsappTemplateSeeder::class,
+            LearmyEducoachAutoReplySeeder::class,
         ]);
 
         // User::factory(10)->create();
