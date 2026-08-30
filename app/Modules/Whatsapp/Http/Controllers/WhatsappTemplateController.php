@@ -178,18 +178,22 @@ class WhatsappTemplateController extends Controller
 
         $this->assertComponentMultiplicity($validated['components']);
 
+        $waba = WhatsappBusinessAccount::where('workspace_id', $workspaceId)->first();
+        $wabaId = $waba ? $waba->waba_id : "workspace_{$workspaceId}_qr";
+
         $template->update([
             'category'   => $validated['category'],
             'components' => $validated['components'],
-            'status'     => 'APPROVED',
+            'waba_id'    => $wabaId,
+            'status'     => $waba ? 'PENDING' : 'APPROVED',
         ]);
 
         $client = CloudApiClient::forWorkspace($workspaceId);
-        if ($client && $template->waba_id !== "workspace_{$workspaceId}_qr") {
+        if ($client && $waba) {
             $metaPayload = $this->buildMetaPayload($validated);
             $resp        = $template->meta_template_id
                 ? $client->editTemplate($template->meta_template_id, $metaPayload)
-                : $client->submitTemplate($template->waba_id, $metaPayload);
+                : $client->submitTemplate($waba->waba_id, $metaPayload);
 
             if ($resp->successful()) {
                 $template->update([
