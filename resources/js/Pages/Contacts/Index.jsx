@@ -94,11 +94,13 @@ function ContactRow({ contact, selected, onToggle, onDelete, onEdit }) {
     );
 }
 
-export default function ContactsIndex({ contacts, filters, segments = [] }) {
+export default function ContactsIndex({ contacts, filters, segments = [], tags = [] }) {
     const { t } = useTranslation();
     const { props } = usePage();
     const flash = props.flash ?? {};
     const [search, setSearch] = useState(filters.search ?? '');
+    const [selectedSegment, setSelectedSegment] = useState(filters.segment ?? '');
+    const [selectedTag, setSelectedTag] = useState(filters.tag ?? '');
     const [showAddModal, setShowAddModal] = useState(false);
     const [editContact, setEditContact] = useState(null);
     const [selected, setSelected] = useState(new Set());
@@ -120,6 +122,7 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
         opt_in_whatsapp: true,
         opt_in_sms: true,
         opt_in_email: true,
+        segment_ids: [],
     });
 
     const openEditModal = (contact) => {
@@ -132,6 +135,7 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
             opt_in_whatsapp: contact.opt_in_whatsapp ?? true,
             opt_in_sms: contact.opt_in_sms ?? true,
             opt_in_email: contact.opt_in_email ?? true,
+            segment_ids: (contact.segments ?? []).map(s => s.id),
         });
     };
 
@@ -168,7 +172,7 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get(route('client.contacts.index'), { search }, { preserveState: true, replace: true });
+        router.get(route('client.contacts.index'), { search, segment: selectedSegment, tag: selectedTag }, { preserveState: true, replace: true });
     };
 
     const handleDelete = (uuid) => {
@@ -267,8 +271,8 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
 
                 {flash.success && <div className="rounded-lg bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-2 text-sm">{flash.success}</div>}
 
-                {/* Search */}
-                <form onSubmit={handleSearch} className="flex gap-2">
+                {/* Search & Filters */}
+                <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                         <input
@@ -279,7 +283,47 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
                             className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
                     </div>
-                    <button type="submit" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition">{t('common.search')}</button>
+                    <div className="flex gap-2">
+                        {segments.length > 0 && (
+                            <select
+                                value={selectedSegment}
+                                onChange={e => {
+                                    setSelectedSegment(e.target.value);
+                                    router.get(route('client.contacts.index'), {
+                                        search,
+                                        segment: e.target.value,
+                                        tag: selectedTag
+                                    }, { preserveState: true, replace: true });
+                                }}
+                                className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                                <option value="">All Segments</option>
+                                {segments.map(seg => (
+                                    <option key={seg.id} value={seg.id}>{seg.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        {tags.length > 0 && (
+                            <select
+                                value={selectedTag}
+                                onChange={e => {
+                                    setSelectedTag(e.target.value);
+                                    router.get(route('client.contacts.index'), {
+                                        search,
+                                        segment: selectedSegment,
+                                        tag: e.target.value
+                                    }, { preserveState: true, replace: true });
+                                }}
+                                className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                                <option value="">All Tags</option>
+                                {tags.map(tag => (
+                                    <option key={tag.id} value={tag.name}>{tag.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        <button type="submit" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition">{t('common.search')}</button>
+                    </div>
                 </form>
 
                 {/* Bulk action bar */}
@@ -506,6 +550,27 @@ export default function ContactsIndex({ contacts, filters, segments = [] }) {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Segments Selection */}
+                            {segments.length > 0 && (
+                                <div>
+                                    <label className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Segments</label>
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                        {segments.map(seg => {
+                                            const checked = editData.segment_ids?.includes(seg.id);
+                                            return (
+                                                <label key={seg.id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs cursor-pointer transition ${checked ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300' : 'border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-brand-400'}`}>
+                                                    <input type="checkbox" className="sr-only" checked={checked} onChange={() => {
+                                                        const ids = checked ? editData.segment_ids.filter(id => id !== seg.id) : [...(editData.segment_ids ?? []), seg.id];
+                                                        setEditData('segment_ids', ids);
+                                                    }} />
+                                                    {seg.name}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">

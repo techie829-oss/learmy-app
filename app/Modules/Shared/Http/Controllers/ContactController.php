@@ -30,7 +30,7 @@ class ContactController extends Controller
         $workspaceId = $request->user()->current_workspace_id ?? $request->user()->workspace_id;
 
         $contacts = Contact::where('workspace_id', $workspaceId)
-            ->with('tags')
+            ->with(['tags', 'segments'])
             ->when($request->search, fn ($q) => $q->where(function ($q) use ($request) {
                 $q->where('first_name', 'like', '%'.$request->search.'%')
                     ->orWhere('last_name', 'like', '%'.$request->search.'%')
@@ -38,6 +38,7 @@ class ContactController extends Controller
                     ->orWhere('email', 'like', '%'.$request->search.'%');
             }))
             ->when($request->tag, fn ($q) => $q->whereHas('tags', fn ($q) => $q->where('name', $request->tag)))
+            ->when($request->segment, fn ($q) => $q->whereHas('segments', fn ($q) => $q->where('segments.id', $request->segment)))
             ->latest()
             ->paginate(50)
             ->withQueryString();
@@ -49,7 +50,7 @@ class ContactController extends Controller
             'contacts' => $contacts,
             'tags' => $tags,
             'segments' => $segments,
-            'filters' => $request->only('search', 'tag'),
+            'filters' => $request->only('search', 'tag', 'segment'),
         ]);
     }
 
