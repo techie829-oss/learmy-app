@@ -25,11 +25,13 @@ Schedule::call(function () {
 
 // ─── Marketing Suite Scheduled Tasks ────────────────────────────────────────
 
-// Dispatch any campaigns scheduled for now
-Schedule::job(new LaunchScheduledCampaignsJob, 'broadcast')
-    ->everyMinute()
-    ->name('launch-scheduled-campaigns')
-    ->withoutOverlapping();
+// Dispatch any campaigns scheduled for now (only when broadcasts feature is enabled)
+if (config('all.features.broadcasts', false)) {
+    Schedule::job(new LaunchScheduledCampaignsJob, 'broadcast')
+        ->everyMinute()
+        ->name('launch-scheduled-campaigns')
+        ->withoutOverlapping();
+}
 
 // Sync WhatsApp templates from Meta (once per day)
 Schedule::call(function () {
@@ -38,16 +40,18 @@ Schedule::call(function () {
     });
 })->daily()->name('sync-whatsapp-templates');
 
-// Dispatch scheduled social posts (every minute)
-Schedule::job(new DispatchScheduledPostsJob, 'social')
-    ->everyMinute()
-    ->name('dispatch-social-posts')
-    ->withoutOverlapping();
+// Dispatch scheduled social posts (every minute, only when social_media feature is enabled)
+if (config('all.features.social_media', false)) {
+    Schedule::job(new DispatchScheduledPostsJob, 'social')
+        ->everyMinute()
+        ->name('dispatch-social-posts')
+        ->withoutOverlapping();
 
-// Refresh expiring social OAuth tokens daily
-Schedule::job(new RefreshSocialTokensJob, 'social')
-    ->dailyAt('02:00')
-    ->name('refresh-social-tokens');
+    // Refresh expiring social OAuth tokens daily
+    Schedule::job(new RefreshSocialTokensJob, 'social')
+        ->dailyAt('02:00')
+        ->name('refresh-social-tokens');
+}
 
 // Reset monthly usage meters on the 1st of each month
 Schedule::call(function () {
