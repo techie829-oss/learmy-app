@@ -271,14 +271,45 @@ class WhatsappDriver implements ChannelDriverInterface
         $interactive = is_array($msg['interactive'] ?? null) ? $msg['interactive'] : [];
         $textBlock = is_array($msg['text'] ?? null) ? $msg['text'] : [];
 
+        // If Meta sends type = 'unsupported' or type is unknown, check if text/media/interactive content exists in payload
+        if ($type === 'unsupported' || empty($type)) {
+            if (! empty($textBlock['body'])) {
+                $type = 'text';
+            } elseif (! empty($msg['button']['text'])) {
+                $type = 'text';
+            } elseif (! empty($interactive['button_reply']['title']) || ! empty($interactive['list_reply']['title']) || ! empty($interactive['nfm_reply'])) {
+                $type = 'interactive';
+            } elseif (! empty($msg['image'])) {
+                $type = 'image';
+            } elseif (! empty($msg['video'])) {
+                $type = 'video';
+            } elseif (! empty($msg['audio'])) {
+                $type = 'audio';
+            } elseif (! empty($msg['document'])) {
+                $type = 'document';
+            } elseif (! empty($msg['location'])) {
+                $type = 'location';
+            } elseif (! empty($msg['contacts'])) {
+                $type = 'contacts';
+            } elseif (! empty($msg['sticker'])) {
+                $type = 'sticker';
+            } elseif (! empty($msg['reaction'])) {
+                $type = 'reaction';
+            }
+        }
+
         // Extract a human-readable body for every message type
         $body = ($textBlock['body'] ?? null)
             ?? (($msg['button'] ?? [])['text'] ?? null)
             ?? (($interactive['button_reply'] ?? [])['title'] ?? null)
             ?? (($interactive['list_reply'] ?? [])['title'] ?? null)
             ?? (is_array($msg[$type] ?? null) && ! isset($msg[$type][0]) ? ($msg[$type]['caption'] ?? null) : null)
-            ?? ($msg['caption'] ?? null)
-            ?? ($msg['errors'][0]['title'] ?? null);
+            ?? ($msg['caption'] ?? null);
+
+        // Fallback for errors or empty body
+        if (($body === null || $body === '') && $type === 'unsupported') {
+            $body = $msg['errors'][0]['title'] ?? null;
+        }
 
         // Type-specific body fallbacks so conversation preview is meaningful
         if ($body === null || $body === '') {
