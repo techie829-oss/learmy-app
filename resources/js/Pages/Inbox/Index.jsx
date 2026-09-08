@@ -32,6 +32,27 @@ function StatusDot({ status }) {
     return <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${colors[status] ?? 'bg-neutral-300'}`} />;
 }
 
+function formatLastMessagePreview(msg) {
+    if (!msg) return '';
+    if (msg.body && msg.body !== 'Message type unknown' && msg.body !== 'unsupported') {
+        return msg.body;
+    }
+    const p = msg.payload || {};
+    const textFromPayload =
+        p.text?.body ||
+        p.button?.text ||
+        p.interactive?.button_reply?.title ||
+        p.interactive?.list_reply?.title ||
+        p.caption;
+    if (textFromPayload) {
+        return textFromPayload;
+    }
+    if (msg.type && msg.type !== 'unsupported') {
+        return `(${msg.type})`;
+    }
+    return msg.body || '(media)';
+}
+
 function ConversationCard({ conv, isFlashing, isActive, userTz }) {
     const { t } = useTranslation();
     const channel = conv.channel_account?.channel ?? 'whatsapp';
@@ -90,7 +111,7 @@ function ConversationCard({ conv, isFlashing, isActive, userTz }) {
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                         <p className={`text-xs truncate flex-1 ${conv.unread_count > 0 ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-500'}`}>
-                            {lastMsg.body || '(media)'}
+                            {formatLastMessagePreview(lastMsg) || '(media)'}
                         </p>
                         {conv.unread_count > 0 && (
                             <span className="shrink-0 h-5 min-w-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center px-1">

@@ -417,18 +417,51 @@ function UnsupportedBubble({ payload, body }) {
     const { t } = useTranslation();
     const errors = payload?.errors ?? [];
     const errorTitle = errors[0]?.title ?? '';
+    const extractedText =
+        payload?.text?.body ||
+        payload?.button?.text ||
+        payload?.interactive?.button_reply?.title ||
+        payload?.interactive?.list_reply?.title ||
+        payload?.caption ||
+        (body && body !== 'Message type unknown' && body !== 'unsupported' ? body : null);
+
+    if (extractedText) {
+        return <WaText text={extractedText} />;
+    }
+
     const isEvent = errorTitle.toLowerCase().includes('event') || body?.toLowerCase().includes('event');
     const isPoll  = errorTitle.toLowerCase().includes('poll') || body?.toLowerCase().includes('poll');
     const Icon  = isEvent ? Calendar : isPoll ? BarChart2 : AlertTriangle;
     const label = isEvent ? t('inbox.event_unsupported')
                 : isPoll  ? t('inbox.poll_unsupported')
-                : (errorTitle || body || t('inbox.unsupported_message_type'));
+                : (errorTitle && errorTitle !== 'Message type unknown' ? errorTitle : t('inbox.unsupported_message_type'));
     return (
         <div className="flex items-center gap-2 opacity-70 italic text-xs py-0.5">
             <Icon className="h-3.5 w-3.5 shrink-0" />
             <span>{label}</span>
         </div>
     );
+}
+
+function formatLastMessagePreview(msg) {
+    if (!msg) return '';
+    if (msg.body && msg.body !== 'Message type unknown' && msg.body !== 'unsupported') {
+        return msg.body;
+    }
+    const p = msg.payload || {};
+    const textFromPayload =
+        p.text?.body ||
+        p.button?.text ||
+        p.interactive?.button_reply?.title ||
+        p.interactive?.list_reply?.title ||
+        p.caption;
+    if (textFromPayload) {
+        return textFromPayload;
+    }
+    if (msg.type && msg.type !== 'unsupported') {
+        return `(${msg.type})`;
+    }
+    return msg.body || '(media)';
 }
 
 /** Resolve {{N}} placeholders in a template component text using its parameters array */
@@ -845,7 +878,7 @@ function ConversationCard({ conv, isActive, userTz }) {
                         </span>
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-400'}`}>
-                        {conv.last_message?.body || '(media)'}
+                        {formatLastMessagePreview(conv.last_message) || '(media)'}
                     </p>
                     {conv.labels?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
