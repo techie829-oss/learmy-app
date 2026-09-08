@@ -321,6 +321,21 @@ function AddOrEditSmtpModal({ show, edit, encryptionOptions, onClose, onSaved })
         activate: edit?.is_active ?? false,
     });
 
+    useEffect(() => {
+        if (show) {
+            setData({
+                host: edit?.host ?? 'smtp.gmail.com',
+                port: edit?.port ?? 587,
+                username: edit?.username ?? '',
+                password: '',
+                encryption: edit?.encryption ?? 'tls',
+                from_email: edit?.from_email ?? '',
+                from_name: edit?.from_name ?? '',
+                activate: edit?.is_active ?? false,
+            });
+        }
+    }, [edit, show]);
+
     const submit = (e) => {
         e.preventDefault();
         if (isEdit) {
