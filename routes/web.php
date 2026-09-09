@@ -56,7 +56,7 @@ Route::get('/sitemap.xml', function () {
     $xml .= '</urlset>';
 
     return response($xml, 200)
-        ->header('Content-Type', 'application/xml')
+        ->header('Content-Type', 'application/xml');
 })->name('sitemap');
 
 Route::get('/robots.txt', function () {
