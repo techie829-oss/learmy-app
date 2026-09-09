@@ -65,13 +65,15 @@ class MeetingNotificationService
                         ? ('Venue: ' . ($meeting->location ?? 'Offline Venue'))
                         : ($meeting->meet_link ?? 'TBD');
 
+                    $dateTime = $this->getDisplayDateTime($meeting, $trigger);
+
                     // Meta Cloud API — send template with parameters
                     $components = [[
                         'type'       => 'body',
                         'parameters' => [
                             ['type' => 'text', 'text' => $contact->first_name ?? $contact->full_name],
                             ['type' => 'text', 'text' => $meeting->title],
-                            ['type' => 'text', 'text' => $meeting->start_time->format('d M Y, h:i A')],
+                            ['type' => 'text', 'text' => $dateTime],
                             ['type' => 'text', 'text' => $locationOrLink],
                         ],
                     ]];
@@ -201,7 +203,7 @@ class MeetingNotificationService
 
             $firstName = $contact->first_name ?? $contact->full_name ?? 'Student';
             $title     = $meeting->title;
-            $dateTime  = $meeting->start_time->format('d M Y, h:i A');
+            $dateTime  = $this->getDisplayDateTime($meeting, $trigger);
             $meetLink  = $meeting->meet_link ?? null;
 
             // Check if user selected a custom template from DB
@@ -210,7 +212,7 @@ class MeetingNotificationService
                 ->first();
 
             if ($dbTemplate && !empty($dbTemplate->components)) {
-                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $contact, $meeting);
+                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $contact, $meeting, $trigger);
             } else {
                 $templateData = $this->buildDefaultQrTemplateData($trigger, $firstName, $title, $dateTime, $meetLink, $qrAccount->workspace_id, $meeting->class_type ?? 'online', $meeting->location ?? null);
             }
@@ -254,7 +256,7 @@ class MeetingNotificationService
         try {
             $sessionId = $qrAccount->meta_json['session_id'] ?? 'workspace_' . $qrAccount->workspace_id . '_qr';
             $title     = $meeting->title;
-            $dateTime  = $meeting->start_time->format('d M Y, h:i A');
+            $dateTime  = $this->getDisplayDateTime($meeting, $trigger);
             $meetLink  = $meeting->meet_link ?? 'TBD';
 
             $dbTemplate = WhatsappTemplate::where('workspace_id', $qrAccount->workspace_id)
@@ -263,7 +265,7 @@ class MeetingNotificationService
 
             if ($dbTemplate && !empty($dbTemplate->components)) {
                 $dummyContact = new Contact(['first_name' => 'Students', 'full_name' => 'Students']);
-                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting);
+                $templateData = $this->renderCustomDbTemplate($dbTemplate->components, $dummyContact, $meeting, $trigger);
             } else {
                 $templateData = $this->buildDefaultQrTemplateData($trigger, 'Students', $title, $dateTime, $meetLink, $qrAccount->workspace_id, $meeting->class_type ?? 'online', $meeting->location ?? null);
             }
@@ -331,12 +333,12 @@ class MeetingNotificationService
     /**
      * Render a custom WhatsappTemplate from DB by replacing dynamic variables
      */
-    private function renderCustomDbTemplate(array $components, Contact $contact, Meeting $meeting): array
+    private function renderCustomDbTemplate(array $components, Contact $contact, Meeting $meeting, string $trigger = 'on_create'): array
     {
         $orgName     = $this->getOrganizationName($meeting->workspace_id);
         $firstName   = $contact->first_name ?? $contact->full_name ?? 'Student';
         $title       = $meeting->title;
-        $dateTime    = $meeting->start_time->format('d M Y, h:i A');
+        $dateTime    = $this->getDisplayDateTime($meeting, $trigger);
         $meetLink    = $meeting->meet_link ?? 'TBD';
         $description = $meeting->description ?? '';
         $location    = $meeting->location ?? '';
@@ -515,5 +517,32 @@ class MeetingNotificationService
             'footer'  => $footer,
             'buttons' => $buttons,
         ];
+    }
+
+    /**
+     * Compute effective display date-time for a meeting notification.
+     * For multi-day classes/events, daily reminders ('morning', 'before_15m', 'on_start')
+     * display today's date with the class start time instead of repeating the initial start_date.
+     */
+    public function getDisplayDateTime(Meeting $meeting, string $trigger = 'on_create'): string
+    {
+        $startTime = \Carbon\Carbon::parse($meeting->start_time);
+        $endTime   = \Carbon\Carbon::parse($meeting->end_time);
+
+        if ($trigger === 'on_create') {
+            if (!$startTime->isSameDay($endTime)) {
+                return $startTime->format('d M Y') . ' - ' . $endTime->format('d M Y') . ', ' . $startTime->format('h:i A');
+            }
+            return $startTime->format('d M Y, h:i A');
+        }
+
+        $now = \Carbon\Carbon::now();
+
+        if ($now->between($startTime->copy()->startOfDay(), $endTime->copy()->endOfDay())) {
+            $todayClassTime = $now->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
+            return $todayClassTime->format('d M Y, h:i A');
+        }
+
+        return $startTime->format('d M Y, h:i A');
     }
 }
