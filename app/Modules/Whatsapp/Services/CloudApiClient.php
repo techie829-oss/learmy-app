@@ -12,7 +12,7 @@ class CloudApiClient
 {
     public static function baseUrl(): string
     {
-        return config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        return config('all.meta.graph_url');
     }
 
     public function __construct(

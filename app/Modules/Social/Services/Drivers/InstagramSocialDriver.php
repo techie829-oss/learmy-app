@@ -40,7 +40,7 @@ class InstagramSocialDriver implements SocialNetworkInterface
             throw new \RuntimeException('Instagram posts require at least one image.');
         }
 
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
+        $graphUrl = config('all.meta.graph_url');
         $container = Http::post("{$graphUrl}/{$igUserId}/media", $containerPayload)->json();
 
         if (empty($container['id'])) {
