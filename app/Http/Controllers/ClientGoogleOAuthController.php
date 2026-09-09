@@ -84,10 +84,10 @@ class ClientGoogleOAuthController extends Controller
             return redirect()->route('client.integrations.index')->with('error', 'Failed to obtain Google Refresh Token. Please try again.');
         }
 
-        $user = $request->user();
-        $workspaceId = $request->session()->get('current_workspace_id')
-            ?? $user?->current_workspace_id
-            ?? $user?->workspace_id;
+        $workspaceId = $this->resolveWorkspaceId($request);
+        if (! $workspaceId) {
+            return redirect()->route('client.integrations.index')->with('error', 'No active workspace found to link Google account.');
+        }
 
         $refreshToken = $response->json('refresh_token');
         $accessToken = $response->json('access_token');
@@ -95,7 +95,7 @@ class ClientGoogleOAuthController extends Controller
 
         // Fetch user email from Google UserInfo
         $userInfo = Http::withToken($accessToken)->get('https://www.googleapis.com/oauth2/v2/userinfo');
-        $googleEmail = $userInfo->json('email') ?? $user->email;
+        $googleEmail = $userInfo->json('email') ?? $user?->email ?? 'unknown@google.com';
 
         WorkspaceGoogleToken::updateOrCreate(
             ['workspace_id' => $workspaceId],
@@ -112,13 +112,48 @@ class ClientGoogleOAuthController extends Controller
 
     public function disconnect(Request $request)
     {
-        $user = $request->user();
-        $workspaceId = $request->session()->get('current_workspace_id')
-            ?? $user?->current_workspace_id
-            ?? $user?->workspace_id;
+        $workspaceId = $this->resolveWorkspaceId($request);
 
-        WorkspaceGoogleToken::where('workspace_id', $workspaceId)->delete();
+        if ($workspaceId) {
+            WorkspaceGoogleToken::where('workspace_id', $workspaceId)->delete();
+        }
 
         return redirect()->route('client.integrations.index')->with('success', 'Google Calendar disconnected.');
+    }
+
+    private function resolveWorkspaceId(Request $request): ?int
+    {
+        $user = $request->user();
+        if (! $user) {
+            return null;
+        }
+
+        $workspaceId = $request->session()->get('current_workspace_id')
+            ?? $user->current_workspace_id
+            ?? $user->workspace_id;
+
+        if (! $workspaceId) {
+            $workspace = $user->ownedWorkspaces()->first()
+                ?? $user->workspaces()->first()
+                ?? \App\Models\Workspace::where('client_id', $user->client_id)->first();
+
+            if (! $workspace) {
+                $workspace = \App\Models\Workspace::create([
+                    'owner_id' => $user->id,
+                    'client_id' => $user->client_id,
+                    'name' => ($user->name ?? 'Default') . "'s Workspace",
+                ]);
+            }
+
+            $workspaceId = $workspace->id;
+
+            try {
+                $user->update(['workspace_id' => $workspaceId]);
+            } catch (\Throwable) {
+                // Ignore if workspace_id column doesn't exist on users table
+            }
+        }
+
+        return $workspaceId;
     }
 }

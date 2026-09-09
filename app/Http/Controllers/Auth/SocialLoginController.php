@@ -77,7 +77,7 @@ class SocialLoginController extends Controller
                     'currency_position' => 'before',
                 ]);
 
-                return User::create([
+                $user = User::create([
                     'name' => $name,
                     'email' => $email,
                     'password' => bcrypt(Str::random(32)),
@@ -87,6 +87,18 @@ class SocialLoginController extends Controller
                     'client_id' => $client->id,
                     'client_role' => User::CLIENT_ROLE_ADMINISTRATOR,
                 ]);
+
+                if (class_exists(\App\Models\Workspace::class)) {
+                    \App\Models\Workspace::firstOrCreate(
+                        ['owner_id' => $user->id],
+                        [
+                            'client_id' => $client->id,
+                            'name' => $name . "'s Workspace",
+                        ]
+                    );
+                }
+
+                return $user;
             });
         }
 
