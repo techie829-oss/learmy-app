@@ -14,7 +14,7 @@ class FacebookDriver implements SocialNetworkInterface
 
     public function fetchAccountInfo(string $accessToken): array
     {
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
         $res = Http::get("{$graphUrl}/me", [
             'fields' => 'id,name,picture',
             'access_token' => $accessToken,

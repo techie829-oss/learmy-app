@@ -103,7 +103,7 @@ class OAuthManager
 
     private function facebookExchange($creds, string $code, string $redirect): array
     {
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
         $res = Http::get("{$graphUrl}/oauth/access_token", [
             'client_id' => $creds->clientId() ?? '',
             'client_secret' => $creds->clientSecret() ?? '',

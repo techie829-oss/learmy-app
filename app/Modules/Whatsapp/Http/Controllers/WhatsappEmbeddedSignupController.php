@@ -40,7 +40,7 @@ class WhatsappEmbeddedSignupController extends Controller
             'code'         => substr($validated['code'], 0, 20) . '...',
         ]);
 
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
 
         $redirectUri = rtrim((string) config('app.url'), '/');
 
@@ -70,7 +70,7 @@ class WhatsappEmbeddedSignupController extends Controller
         Log::info('WhatsApp embedded signup: code exchange attempt', [
             'workspace_id' => $workspaceId,
             'redirect_uri' => $tokenParams['redirect_uri'] ?? 'OMITTED',
-            'api_version'  => 'v20.0',
+            'api_version'  => 'v26.0',
             'status'       => $tokenRes->status(),
             'error'        => $tokenRes->json('error.message') ?? null,
             'subcode'      => $tokenRes->json('error.error_subcode') ?? null,
@@ -98,7 +98,7 @@ class WhatsappEmbeddedSignupController extends Controller
         $shortToken = $tokenRes->json('access_token');
 
         // Exchange short-lived token for a long-lived token (60 days)
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
         $longTokenRes = Http::get("{$graphUrl}/oauth/access_token", [
             'grant_type'        => 'fb_exchange_token',
             'client_id'         => $meta->appId(),
@@ -112,7 +112,7 @@ class WhatsappEmbeddedSignupController extends Controller
 
         // If waba_id was not provided via postMessage, fetch it from the debug_token endpoint
         if (empty($validated['waba_id'])) {
-            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+            $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
             $debugTokenRes = Http::get("{$graphUrl}/debug_token", [
                 'input_token'  => $accessToken,
                 'access_token' => $meta->appId() . '|' . $meta->appSecret(),
@@ -160,7 +160,7 @@ class WhatsappEmbeddedSignupController extends Controller
         }
 
         // Fetch WABA details from Meta
-        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
         $wabaRes = Http::withToken($accessToken)
             ->get("{$graphUrl}/{$validated['waba_id']}", [
                 'fields' => 'id,name,currency,timezone_id',
@@ -290,7 +290,7 @@ class WhatsappEmbeddedSignupController extends Controller
         $appSecret = $meta->appSecret();
         // App Access Token: {app_id}|{app_secret} — must be passed as query param, not Bearer header
         $appToken  = $appId . '|' . $appSecret;
-        $graphUrl  = config('all.meta.graph_url', 'https://graph.facebook.com/v20.0');
+        $graphUrl  = config('all.meta.graph_url', 'https://graph.facebook.com/v26.0');
 
         // Step 1: Subscribe our Meta App to this WABA's events.
         // Use the App Access Token (more reliable than the short-lived user token).
