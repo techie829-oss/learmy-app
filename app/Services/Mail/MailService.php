@@ -122,6 +122,10 @@ class MailService
                 'name' => $smtp->from_name,
             ],
         ]);
+
+        Config::set('mail.default', 'dynamic_smtp');
+        Config::set('mail.from.address', $smtp->from_email);
+        Config::set('mail.from.name', $smtp->from_name);
     }
 
     private function replacePlaceholders(string $text, array $replacements): string

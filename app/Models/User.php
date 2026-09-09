@@ -199,6 +199,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendPasswordResetNotification($token): void
     {
         $mailService = app(MailService::class);
+        $smtp = SmtpConfiguration::getActive();
+        if ($smtp) {
+            $mailService->configureMailer($smtp);
+        }
+
         $url = url(route('password.reset', [
             'token' => $token,
             'email' => $this->getEmailForPasswordReset(),
@@ -216,6 +221,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification(): void
     {
         $mailService = app(MailService::class);
+        $smtp = SmtpConfiguration::getActive();
+        if ($smtp) {
+            $mailService->configureMailer($smtp);
+        }
+
         $url = URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),
