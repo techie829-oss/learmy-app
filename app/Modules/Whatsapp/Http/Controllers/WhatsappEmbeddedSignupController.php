@@ -322,6 +322,10 @@ class WhatsappEmbeddedSignupController extends Controller
         // /{app_id}/subscriptions sets ONE URL for the entire Meta App; all WABAs share it.
         // We use the stable global endpoint so multiple embedded-signup WABAs don't overwrite each other.
         // The App Access Token must be passed as access_token body param (Bearer header not accepted here).
+        
+        // --- SKIPPED: Prevent Learmy from overwriting the Master Webhook (WhatsMeet) ---
+        return null;
+
         try {
             $callbackUrl  = route('webhooks.whatsapp.global.receive');
             
